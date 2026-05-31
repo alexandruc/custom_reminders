@@ -108,6 +108,63 @@ monkeydo bin/CustomReminders.prg fr245
 | **Down / Right** | Scroll down, change value down |
 | **Back / Left** | Go back, delete character, cancel |
 
+## Automated Testing
+
+The project includes an automated test runner that builds, launches the simulator, and runs UI test scenarios.
+
+### Prerequisites
+
+```bash
+# Install cliclick (macOS CLI mouse automation)
+brew install cliclick
+```
+
+### Usage
+
+```bash
+# Run all automated tests
+./test.sh
+
+# Run a specific test
+./test.sh test_add_reminder_flow
+
+# List available tests
+./test.sh list
+```
+
+### Available Tests
+
+| Test | Description |
+|---|---|
+| `test_app_launches` | Verify app launches and shows the main reminder list screen |
+| `test_add_reminder_flow` | Full flow: add a reminder via the 5-step wizard |
+| `test_toggle_reminder` | Add a reminder and toggle it on/off |
+| `test_reminder_alert` | Verify alert popup display (manual verification) |
+
+### How It Works
+
+1. **Build** — Compiles the app for FR245
+2. **Launch** — Starts the Connect IQ simulator in the background
+3. **Automate** — Uses AppleScript + `cliclick` to simulate button presses
+4. **Capture** — Takes screenshots for visual verification in `test_screenshots/`
+5. **Cleanup** — Closes the simulator after each test
+
+### Manual Testing Loop
+
+For interactive testing, use this loop in your terminal:
+
+```bash
+# One-liner: build → launch → test
+monkeyc -f monkey.jungle -o bin/CustomReminders.prg -d fr245 -y ../developer_key && \
+monkeydo bin/CustomReminders.prg fr245
+```
+
+In the simulator:
+- Press **m** for Menu (add reminder)
+- Press **Enter** for Select (confirm/add)
+- Press **↑** / **↓** for navigation
+- Press **Esc** for Back
+
 ## Adding Reminders (On-Watch)
 
 The reminder creation wizard has 5 steps:
@@ -193,3 +250,29 @@ The launcher icon is 42×42 but some devices expect different sizes. The icon is
 ## License
 
 This project is provided as-is for educational purposes.
+
+### Important: macOS Accessibility Permission
+
+The automated tests require **Accessibility permission** for your terminal app to send keyboard events to the simulator:
+
+1. Open **System Settings** → **Privacy & Security** → **Accessibility**
+2. Find your terminal app (Terminal.app, iTerm2, Warp, etc.)
+3. Toggle it **ON**
+4. Restart your terminal
+
+Without this permission, you'll see:
+```
+osascript is not allowed to send keystrokes. (1002)
+```
+
+### Manual Quick-Test Loop
+
+If you don't want to grant permissions, use this loop to manually test:
+
+```bash
+# Build and launch
+monkeyc -f monkey.jungle -o bin/CustomReminders.prg -d fr245 -y ../developer_key && \
+monkeydo bin/CustomReminders.prg fr245
+```
+
+Then interact with the simulator window directly.

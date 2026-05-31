@@ -52,6 +52,11 @@ class CustomRemindersApp extends Application.AppBase {
         _listDelegate = new ReminderListDelegate(_listView);
         return [_listView, _listDelegate];
     }
+
+    //! Return service delegate for background processing
+    function getServiceDelegate() as [System.ServiceDelegate] {
+        return [new ReminderBackgroundService()];
+    }
 }
 
 //! Delegate for the list view - handles button input

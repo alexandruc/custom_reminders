@@ -4,11 +4,15 @@ import Toybox.Application.Storage;
 import Toybox.Background;
 import Toybox.Time;
 
-//! Background service for checking reminders
-(:background)
+//! Background service for checking reminders.
+//! On SDK 3.x, this runs in an isolated process — all logic is inlined
+//! here since we cannot import non-background classes.
 class ReminderBackgroundService extends System.ServiceDelegate {
 
-    private var _store as ReminderStore?;
+    const STORAGE_PREFIX = "reminders_";
+    const TYPE_INTERVAL = 0;
+    const TYPE_TIME = 1;
+
     private var _lastCheckHour as Number? = null;
     private var _lastCheckMin as Number? = null;
 
@@ -18,41 +22,18 @@ class ReminderBackgroundService extends System.ServiceDelegate {
 
     function onStart(state as Dictionary?) as Void {
         System.println("ReminderBackgroundService: onStart");
-        try {
-            _store = new ReminderStore();
-            _store.loadFromStorage();
-        } catch (ex) {
-            System.println("ReminderBackgroundService: Storage load failed");
-            _store = new ReminderStore();
-        }
         checkReminders();
         registerNextEvent();
     }
 
     function onTemporalEvent() as Void {
         System.println("ReminderBackgroundService: temporal event");
-        try {
-            _store = new ReminderStore();
-            _store.loadFromStorage();
-        } catch (ex) {
-            System.println("ReminderBackgroundService: Storage load failed");
-            return;
-        }
         checkReminders();
         registerNextEvent();
     }
 
     function onSettingsChanged() as Void {
         System.println("ReminderBackgroundService: settings changed");
-        try {
-            var jsonStr = Storage.getValue("reminders_json") as String?;
-            if (jsonStr != null && jsonStr != "") {
-                _store = new ReminderStore();
-                _store.loadFromJson(jsonStr);
-            }
-        } catch (ex) {
-            System.println("Settings error");
-        }
     }
 
     function onStop() as Void {
@@ -63,25 +44,21 @@ class ReminderBackgroundService extends System.ServiceDelegate {
     hidden function registerNextEvent() as Void {
         try {
             var now = System.getClockTime();
-            // Calculate epoch seconds for 5 minutes from now
             var nowEpoch = Time.now().value();
             var targetEpoch = nowEpoch + 300; // 5 minutes in seconds
             var targetMoment = new Time.Moment(targetEpoch);
-
             Background.registerForTemporalEvent(targetMoment);
-            System.println("Timer registered for " + (now.min + 5) + " min from now");
+            System.println("Timer set for 5 min from now");
         } catch (ex) {
-            System.println("Timer registration error");
+            System.println("Timer error: " + ex);
         }
     }
 
+    //! Load and check all reminders
     hidden function checkReminders() as Void {
-        var store = _store;
-        if (store == null) { return; }
-
         var now = System.getClockTime();
 
-        // Avoid firing more than once per minute for time-based reminders
+        // Debounce: don't check more than once per minute
         if (_lastCheckHour != null && _lastCheckMin != null &&
             _lastCheckHour == now.hour && _lastCheckMin == now.min) {
             return;
@@ -89,21 +66,72 @@ class ReminderBackgroundService extends System.ServiceDelegate {
         _lastCheckHour = now.hour;
         _lastCheckMin = now.min;
 
-        var reminders = store.getReminders();
-        for (var i = 0; i < reminders.size(); i++) {
-            var reminder = reminders[i];
-            if (reminder.shouldFire()) {
-                System.println("Firing: " + reminder.text);
+        var cnt = Storage.getValue(STORAGE_PREFIX + "count");
+        if (cnt == null) { return; }
+        var count = cnt as Number;
 
-                reminder.markTriggered();
-                store.updateReminder(reminder);
+        for (var i = 0; i < count; i++) {
+            var prefix = STORAGE_PREFIX + i;
+            var enabled = Storage.getValue(prefix + "_enabled");
+            if (enabled == null || enabled == false) { continue; }
 
-                // Play vibration
-                VibrationPattern.playSimple();
+            var rtype = Storage.getValue(prefix + "_type");
+            if (rtype == null) { continue; }
+            var rType = rtype as Number;
+            var fired = false;
 
-                // Wake the app
+            if (rType == TYPE_INTERVAL) {
+                var interval = Storage.getValue(prefix + "_interval");
+                var lastTriggered = Storage.getValue(prefix + "_lastTriggered");
+                if (interval == null) { continue; }
+
+                var nowTimer = System.getTimer();
+                if (lastTriggered == null) {
+                    fired = true;
+                } else {
+                    var elapsed = nowTimer - (lastTriggered as Number);
+                    if (elapsed >= (interval as Number)) {
+                        fired = true;
+                    }
+                }
+            } else if (rType == TYPE_TIME) {
+                var timeStr = Storage.getValue(prefix + "_time");
+                if (timeStr != null && timeStr != "") {
+                    var timeVal = timeStr as String;
+                    var colonIdx = timeVal.find(":");
+                    if (colonIdx != null) {
+                        var targetHour = timeVal.substring(0, colonIdx).toNumber();
+                        var targetMin = timeVal.substring(colonIdx + 1, timeVal.length()).toNumber();
+                        if (targetHour != null && targetMin != null) {
+                            if (now.hour == targetHour && now.min == targetMin) {
+                                var lastTriggered = Storage.getValue(prefix + "_lastTriggered");
+                                if (lastTriggered == null) {
+                                    fired = true;
+                                } else {
+                                    var nowTimer = System.getTimer();
+                                    if (nowTimer - (lastTriggered as Number) > 60) {
+                                        fired = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (fired) {
+                var text = Storage.getValue(prefix + "_text");
+                var displayText = "";
+                if (text != null) {
+                    displayText = text as String;
+                }
+
+                // Update last triggered
+                Storage.setValue(prefix + "_lastTriggered", System.getTimer());
+
+                // Wake the app to show alert and play vibration
                 try {
-                    Background.requestApplicationWake(reminder.text);
+                    Background.requestApplicationWake(displayText);
                 } catch (ex) {
                     System.println("Wake error");
                 }
