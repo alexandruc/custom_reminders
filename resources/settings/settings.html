@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Custom Reminders Settings</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 16px;
+        }
+        h1 {
+            font-size: 20px;
+            margin-bottom: 16px;
+            color: #007AFF;
+        }
+        .reminder-card {
+            background: white;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .reminder-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .reminder-text {
+            font-size: 15px;
+            font-weight: 600;
+            flex: 1;
+        }
+        .reminder-schedule {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 28px;
+            flex-shrink: 0;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #ccc;
+            border-radius: 28px;
+            transition: 0.3s;
+        }
+        .toggle-slider:before {
+            content: "";
+            position: absolute;
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background: #34C759;
+        }
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-right: 6px;
+        }
+        .btn-edit { background: #E3F2FD; color: #1976D2; }
+        .btn-delete { background: #FFEBEE; color: #D32F2F; }
+        .btn-add {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: white;
+            border-radius: 14px;
+            padding: 20px;
+            width: 90%;
+            max-width: 400px;
+        }
+        .modal-content h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+        }
+        .form-group {
+            margin-bottom: 14px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #555;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .modal-buttons .btn {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+        }
+        .btn-save { background: #34C759; color: white; }
+        .btn-cancel { background: #eee; color: #333; }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        .empty-state svg {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 12px;
+            opacity: 0.4;
+        }
+    </style>
+</head>
+<body>
+    <h1>⏰ Custom Reminders</h1>
+    <div id="reminderList"></div>
+    <button class="btn-add" onclick="openAddModal()">+ Add Reminder</button>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h2 id="modalTitle">Add Reminder</h2>
+            <div class="form-group">
+                <label>Reminder Text</label>
+                <textarea id="inputText" placeholder="e.g., Drink water, Stand up, Stretch..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Trigger Type</label>
+                <select id="inputType" onchange="onTypeChange()">
+                    <option value="interval">Time Interval</option>
+                    <option value="time">Specific Time</option>
+                </select>
+            </div>
+            <div class="form-group" id="intervalGroup">
+                <label>Interval</label>
+                <select id="inputInterval">
+                    <option value="300">Every 5 minutes</option>
+                    <option value="900">Every 15 minutes</option>
+                    <option value="1800">Every 30 minutes</option>
+                    <option value="3600" selected>Every 1 hour</option>
+                    <option value="7200">Every 2 hours</option>
+                    <option value="custom">Custom (minutes)</option>
+                </select>
+                <input type="number" id="inputCustomInterval" placeholder="Minutes"
+                       style="display:none; margin-top:6px;" min="1" max="1440"/>
+            </div>
+            <div class="form-group" id="timeGroup" style="display:none;">
+                <label>Time of Day</label>
+                <input type="time" id="inputTime" value="14:00"/>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="inputEnabled" checked/> Enabled
+                </label>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-save" onclick="saveReminder()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Reminder data model
+        var reminders = [];
+        var editingIndex = -1;
+
+        // Generate unique ID
+        function generateId() {
+            return 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        }
+
+        // Render reminder list
+        function render() {
+            var list = document.getElementById('reminderList');
+            if (reminders.length === 0) {
+                list.innerHTML = '<div class="empty-state">' +
+                    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>' +
+                    '<p>No reminders yet.<br/>Tap "Add Reminder" to create one.</p></div>';
+                return;
+            }
+            var html = '';
+            for (var i = 0; i < reminders.length; i++) {
+                var r = reminders[i];
+                var schedule = '';
+                if (r.type === 'interval') {
+                    var mins = r.interval / 60;
+                    if (mins < 60) schedule = 'Every ' + mins + ' min';
+                    else schedule = 'Every ' + (mins / 60) + ' hour(s)';
+                } else {
+                    schedule = 'At ' + r.time;
+                }
+                html += '<div class="reminder-card">' +
+                    '<div class="reminder-header">' +
+                        '<span class="reminder-text">' + escapeHtml(r.text) + '</span>' +
+                        '<label class="toggle-switch">' +
+                            '<input type="checkbox" ' + (r.enabled ? 'checked' : '') +
+                            ' onchange="toggleReminder(' + i + ', this.checked)"/>' +
+                            '<span class="toggle-slider"></span>' +
+                        '</label>' +
+                    '</div>' +
+                    '<div class="reminder-schedule">' + schedule +
+                        ' &middot; ' + (r.enabled ? 'Active' : 'Inactive') + '</div>' +
+                    '<div>' +
+                        '<button class="btn btn-edit" onclick="openEditModal(' + i + ')">Edit</button>' +
+                        '<button class="btn btn-delete" onclick="deleteReminder(' + i + ')">Delete</button>' +
+                    '</div>' +
+                '</div>';
+            }
+            list.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
+
+        function toggleReminder(index, enabled) {
+            reminders[index].enabled = enabled;
+            saveToConnectIQ();
+            render();
+        }
+
+        function deleteReminder(index) {
+            if (confirm('Delete this reminder?')) {
+                reminders.splice(index, 1);
+                saveToConnectIQ();
+                render();
+            }
+        }
+
+        function openAddModal() {
+            editingIndex = -1;
+            document.getElementById('modalTitle').textContent = 'Add Reminder';
+            document.getElementById('inputText').value = '';
+            document.getElementById('inputType').value = 'interval';
+            document.getElementById('inputInterval').value = '3600';
+            document.getElementById('inputCustomInterval').value = '';
+            document.getElementById('inputTime').value = '14:00';
+            document.getElementById('inputEnabled').checked = true;
+            onTypeChange();
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function openEditModal(index) {
+            editingIndex = index;
+            var r = reminders[index];
+            document.getElementById('modalTitle').textContent = 'Edit Reminder';
+            document.getElementById('inputText').value = r.text;
+            document.getElementById('inputType').value = r.type;
+            if (r.type === 'interval') {
+                var opts = document.getElementById('inputInterval').options;
+                var found = false;
+                for (var i = 0; i < opts.length; i++) {
+                    if (opts[i].value == r.interval) {
+                        document.getElementById('inputInterval').value = opts[i].value;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    document.getElementById('inputInterval').value = 'custom';
+                    document.getElementById('inputCustomInterval').value = r.interval / 60;
+                }
+                document.getElementById('inputTime').value = '';
+            } else {
+                document.getElementById('inputTime').value = r.time;
+            }
+            document.getElementById('inputEnabled').checked = r.enabled;
+            onTypeChange();
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').classList.remove('active');
+        }
+
+        function onTypeChange() {
+            var type = document.getElementById('inputType').value;
+            document.getElementById('intervalGroup').style.display = type === 'interval' ? 'block' : 'none';
+            document.getElementById('timeGroup').style.display = type === 'time' ? 'block' : 'none';
+        }
+
+        function saveReminder() {
+            var text = document.getElementById('inputText').value.trim();
+            if (!text) { alert('Please enter reminder text'); return; }
+
+            var type = document.getElementById('inputType').value;
+            var reminder = {
+                id: editingIndex >= 0 ? reminders[editingIndex].id : generateId(),
+                text: text,
+                type: type,
+                enabled: document.getElementById('inputEnabled').checked
+            };
+
+            if (type === 'interval') {
+                var intervalVal = document.getElementById('inputInterval').value;
+                if (intervalVal === 'custom') {
+                    var customMins = parseInt(document.getElementById('inputCustomInterval').value);
+                    if (!customMins || customMins < 1) { alert('Enter valid minutes'); return; }
+                    reminder.interval = customMins * 60;
+                } else {
+                    reminder.interval = parseInt(intervalVal);
+                }
+            } else {
+                reminder.time = document.getElementById('inputTime').value;
+                if (!reminder.time) { alert('Please select a time'); return; }
+            }
+
+            if (editingIndex >= 0) {
+                reminders[editingIndex] = reminder;
+            } else {
+                if (reminders.length >= 20) { alert('Maximum 20 reminders allowed'); return; }
+                reminders.push(reminder);
+            }
+
+            saveToConnectIQ();
+            closeModal();
+            render();
+        }
+
+        function saveToConnectIQ() {
+            var json = JSON.stringify(reminders);
+            // Communicate back to Connect IQ app via settings property
+            var params = {};
+            params['reminders_json'] = json;
+            params['last_sync'] = Date.now();
+
+            // Use Garmin Connect IQ settings communication
+            if (typeof Communicator !== 'undefined') {
+                Communicator.saveSettings(params);
+            } else if (typeof window.external !== 'undefined' && window.external.saveSettings) {
+                // Fallback for some Connect IQ WebView implementations
+                window.external.saveSettings(JSON.stringify(params));
+            } else {
+                console.log('Settings to save:', JSON.stringify(params));
+            }
+        }
+
+        // Load settings from Connect IQ on page load
+        function loadSettings() {
+            // The Connect IQ framework injects settings via the settings object
+            if (typeof Communicator !== 'undefined' && Communicator.loadSettings) {
+                var settings = Communicator.loadSettings();
+                if (settings && settings['reminders_json']) {
+                    try {
+                        reminders = JSON.parse(settings['reminders_json']);
+                    } catch(e) {
+                        reminders = [];
+                    }
+                }
+            }
+            render();
+        }
+
+        // Initialize
+        loadSettings();
+    </script>
+</body>
+</html>

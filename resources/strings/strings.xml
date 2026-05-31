@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<resources>
+    <strings>
+        <string id="AppName">Custom Reminders</string>
+        <string id="ReminderListTitle">Reminders</string>
+        <string id="AddReminder">Add Reminder</string>
+        <string id="EditReminder">Edit Reminder</string>
+        <string id="DeleteReminder">Delete Reminder</string>
+        <string id="NoReminders">No reminders yet</string>
+        <string id="Active">Active</string>
+        <string id="Inactive">Inactive</string>
+        <string id="Toggle">Toggle</string>
+        <string id="Save">Save</string>
+        <string id="Cancel">Cancel</string>
+        <string id="Dismiss">Dismiss</string>
+        <string id="ReminderText">Reminder Text</string>
+        <string id="ReminderType">Type</string>
+        <string id="TypeInterval">Interval</string>
+        <string id="TypeTime">Time of Day</string>
+        <string id="IntervalLabel">Interval</string>
+        <string id="TimeLabel">Time</string>
+        <string id="Enabled">Enabled</string>
+        <string id="FiveMinutes">Every 5 min</string>
+        <string id="FifteenMinutes">Every 15 min</string>
+        <string id="ThirtyMinutes">Every 30 min</string>
+        <string id="OneHour">Every 1 hour</string>
+        <string id="TwoHours">Every 2 hours</string>
+        <string id="CustomInterval">Custom</string>
+        <string id="ReminderFired">Reminder</string>
+        <string id="SettingsSaved">Settings Saved</string>
+        <string id="SettingsError">Error Saving Settings</string>
+        <string id="StorageFull">Storage Full!</string>
+        <string id="MaxReminders">Max reminders reached</string>
+        <string id="BatteryWarning">Power save may affect reminders</string>
+    </strings>
+</resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<resources>
+    <properties>
+        <property id="reminders_json" type="string"></property>
+        <property id="last_sync" type="long">0</property>
+        <property id="last_sync_stored" type="long">0</property>
+    </properties>
+</resources>

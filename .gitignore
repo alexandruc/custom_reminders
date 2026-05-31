@@ -1,0 +1,18 @@
+# Build artifacts
+bin/
+*.prg
+*.iq
+*.iq.war
+
+# macOS
+.DS_Store
+._*
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log

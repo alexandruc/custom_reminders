@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<resources>
+    <properties>
+        <!-- JSON blob containing all reminders, synced from phone companion -->
+        <property id="reminders_json" type="string"></property>
+        <!-- Last sync timestamp from phone -->
+        <property id="last_sync" type="long">0</property>
+        <!-- Last sync timestamp stored on watch (to detect newer settings) -->
+        <property id="last_sync_stored" type="long">0</property>
+    </properties>
+</resources>
