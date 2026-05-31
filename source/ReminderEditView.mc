@@ -3,275 +3,259 @@ import Toybox.WatchUi;
 import Toybox.Graphics;
 import Toybox.System;
 
-//! Wizard view for adding/editing reminders
+//! Wizard view for adding/editing reminders with clean spacing
 class ReminderEditView extends WatchUi.View {
 
-    const STEP_TEXT = 0;
-    const STEP_TYPE = 1;
+    const STEP_TEXT     = 0;
+    const STEP_TYPE     = 1;
     const STEP_INTERVAL = 2;
-    const STEP_TIME = 3;
-    const STEP_ENABLED = 4;
-    const STEP_CONFIRM = 5;
+    const STEP_TIME     = 3;
+    const STEP_ENABLED  = 4;
+    const STEP_CONFIRM  = 5;
 
     const CHARS = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,!?-_";
     const INTERVALS = [300, 900, 1800, 3600, 7200];
     const INTERVAL_LABELS = ["5 min", "15 min", "30 min", "1 hour", "2 hours"];
 
-    // Local copies of Reminder types since we can't access them as module constants
     const TYPE_INTERVAL = 0;
     const TYPE_TIME = 1;
 
-    private var _store as ReminderStore;
-    private var _editIndex as Number;
-    private var _currentStep as Number;
-    private var _reminderText as String = "";
-    private var _reminderType as Number = 0;
-    private var _reminderInterval as Number = 3600;
-    private var _reminderEnabled as Boolean = true;
-    private var _charIndex as Number = 0;
-    private var _hour as Number = 14;
-    private var _minute as Number = 0;
-    private var _intervalIndex as Number = 3;
+    private var _store    as ReminderStore;
+    private var _editIdx  as Number;
+    private var _step     as Number;
 
-    function initialize(store as ReminderStore, editIndex as Number) {
+    private var _text      as String = "";
+    private var _type      as Number = 0;
+    private var _interval  as Number = 3600;
+    private var _enabled   as Boolean = true;
+    private var _charIdx   as Number = 0;
+    private var _hour      as Number = 14;
+    private var _minute    as Number = 0;
+    private var _intIdx    as Number = 3;
+
+    // Layout
+    private var _isSmall  as Boolean = false;
+    private var _marginT  as Number = 0;
+    private var _marginB  as Number = 0;
+    private var _contentY as Number = 0;
+    private var _rowGap   as Number = 0;
+
+    function initialize(store as ReminderStore, editIdx as Number) {
         View.initialize();
-        _store = store;
-        _editIndex = editIndex;
-        _currentStep = STEP_TEXT;
+        _store  = store;
+        _editIdx = editIdx;
+        _step   = STEP_TEXT;
 
-        // If editing an existing reminder, load its values
-        if (editIndex >= 0) {
-            var reminders = _store.getReminders();
-            if (editIndex < reminders.size()) {
-                var r = reminders[editIndex];
-                _reminderText = r.text;
-                _reminderType = r.type;
-                _reminderInterval = r.interval;
-                _reminderEnabled = r.enabled;
-
-                // Find matching interval index
+        if (editIdx >= 0) {
+            var rem = _store.getReminders();
+            if (editIdx < rem.size()) {
+                var r = rem[editIdx];
+                _text    = r.text;
+                _type    = r.type;
+                _interval = r.interval;
+                _enabled  = r.enabled;
                 for (var i = 0; i < INTERVALS.size(); i++) {
-                    if (INTERVALS[i] == _reminderInterval) {
-                        _intervalIndex = i;
-                        break;
-                    }
+                    if (INTERVALS[i] == _interval) { _intIdx = i; break; }
                 }
             }
         }
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
-        var width = dc.getWidth();
-        var height = dc.getHeight();
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        _isSmall = ((w < h ? w : h) <= 240);
+        var isRound = (w == h);
 
+        _marginT = _isSmall ? 35 : 15;
+        _marginB = _isSmall ? 42 : 20;
+        _rowGap  = _isSmall ? 20 : 32;
+        _contentY = _marginT + 24;
+
+        // ── Background ──
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.fillRectangle(0, 0, width, height);
+        dc.fillRectangle(0, 0, w, h);
 
+        // ── Step title ──
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(width / 2, 15, Graphics.FONT_TINY, getStepTitle(), Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w / 2, _marginT + 2, Graphics.FONT_TINY, getStepTitle(),
+            Graphics.TEXT_JUSTIFY_CENTER);
 
+        // ── Step content ──
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        var contentY = height / 3;
 
-        if (_currentStep == STEP_TEXT) {
-            drawTextInput(dc, width, contentY);
-        } else if (_currentStep == STEP_TYPE) {
-            drawTypeSelect(dc, width, contentY);
-        } else if (_currentStep == STEP_INTERVAL) {
-            drawIntervalSelect(dc, width, contentY);
-        } else if (_currentStep == STEP_TIME) {
-            drawTimeSelect(dc, width, contentY);
-        } else if (_currentStep == STEP_ENABLED) {
-            drawEnabledToggle(dc, width, contentY);
-        } else if (_currentStep == STEP_CONFIRM) {
-            drawConfirm(dc, width, contentY);
-        }
+        if      (_step == STEP_TEXT)     { drawTextInput(dc, w); }
+        else if (_step == STEP_TYPE)     { drawTypeSelect(dc, w); }
+        else if (_step == STEP_INTERVAL) { drawIntervalSelect(dc, w); }
+        else if (_step == STEP_TIME)     { drawTimeSelect(dc, w); }
+        else if (_step == STEP_ENABLED)  { drawEnabledToggle(dc, w); }
+        else if (_step == STEP_CONFIRM)  { drawConfirm(dc, w); }
 
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(width / 2, height - 25, Graphics.FONT_TINY, "UP/DOWN:Change SELECT:Next", Graphics.TEXT_JUSTIFY_CENTER);
+
     }
 
-    hidden function drawTextInput(dc as Graphics.Dc, width as Number, y as Number) as Void {
-        var displayText = _reminderText == "" ? "(empty)" : _reminderText;
-        dc.drawText(width / 2, y, Graphics.FONT_MEDIUM, displayText, Graphics.TEXT_JUSTIFY_CENTER);
-        if (_charIndex < CHARS.length()) {
-            var ch = CHARS.substring(_charIndex, _charIndex + 1);
+    hidden function drawTextInput(dc as Graphics.Dc, w as Number) as Void {
+        var label = _text.length() == 0 ? "(empty)" : _text;
+        dc.drawText(w / 2, _contentY, Graphics.FONT_TINY, label,
+            Graphics.TEXT_JUSTIFY_CENTER);
+
+        if (_charIdx < CHARS.length()) {
+            var ch = CHARS.substring(_charIdx, _charIdx + 1);
             dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(width / 2, y + 40, Graphics.FONT_LARGE, ch, Graphics.TEXT_JUSTIFY_CENTER);
+            dc.drawText(w / 2, _contentY + 22, Graphics.FONT_SMALL, ch,
+                Graphics.TEXT_JUSTIFY_CENTER);
         }
     }
 
-    hidden function drawTypeSelect(dc as Graphics.Dc, width as Number, y as Number) as Void {
-        var intervalLabel = (_reminderType == TYPE_INTERVAL ? "► " : "  ") + "Interval";
-        var timeLabel = (_reminderType == TYPE_TIME ? "► " : "  ") + "Time of Day";
-        dc.drawText(width / 2, y, Graphics.FONT_MEDIUM, intervalLabel, Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(width / 2, y + 40, Graphics.FONT_MEDIUM, timeLabel, Graphics.TEXT_JUSTIFY_CENTER);
+    hidden function drawTypeSelect(dc as Graphics.Dc, w as Number) as Void {
+        var iLabel = (_type == TYPE_INTERVAL ? "► " : "  ") + "Interval";
+        var tLabel = (_type == TYPE_TIME    ? "► " : "  ") + "Time of Day";
+        dc.drawText(w / 2, _contentY, Graphics.FONT_TINY, iLabel, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w / 2, _contentY + _rowGap, Graphics.FONT_TINY, tLabel, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
-    hidden function drawIntervalSelect(dc as Graphics.Dc, width as Number, y as Number) as Void {
-        for (var i = 0; i < INTERVAL_LABELS.size(); i++) {
-            if (i == _intervalIndex) {
-                dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(width / 2, y + (i * 30), Graphics.FONT_MEDIUM, "► " + INTERVAL_LABELS[i], Graphics.TEXT_JUSTIFY_CENTER);
-            } else {
-                dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(width / 2, y + (i * 30), Graphics.FONT_MEDIUM, "  " + INTERVAL_LABELS[i], Graphics.TEXT_JUSTIFY_CENTER);
-            }
+    hidden function drawIntervalSelect(dc as Graphics.Dc, w as Number) as Void {
+        var start = 0;
+        var visible = 3;
+        if (_intIdx >= visible) { start = _intIdx - (visible - 1); }
+
+        for (var i = start; i < INTERVAL_LABELS.size(); i++) {
+            var ry = _contentY + (i - start) * _rowGap;
+            if (ry > dc.getHeight() - _marginB - 15) { break; }
+            dc.setColor(
+                i == _intIdx ? Graphics.COLOR_GREEN : Graphics.COLOR_WHITE,
+                Graphics.COLOR_TRANSPARENT);
+            var prefix = i == _intIdx ? "► " : "  ";
+            dc.drawText(w / 2, ry, Graphics.FONT_TINY, prefix + INTERVAL_LABELS[i],
+                Graphics.TEXT_JUSTIFY_CENTER);
         }
     }
 
-    hidden function drawTimeSelect(dc as Graphics.Dc, width as Number, y as Number) as Void {
-        dc.drawText(width / 2, y, Graphics.FONT_LARGE, formatTime(_hour, _minute), Graphics.TEXT_JUSTIFY_CENTER);
+    hidden function drawTimeSelect(dc as Graphics.Dc, w as Number) as Void {
+        dc.drawText(w / 2, _contentY, Graphics.FONT_MEDIUM,
+            formatTime(_hour, _minute), Graphics.TEXT_JUSTIFY_CENTER);
     }
 
-    hidden function drawEnabledToggle(dc as Graphics.Dc, width as Number, y as Number) as Void {
-        var status = _reminderEnabled ? "Enabled" : "Disabled";
-        dc.drawText(width / 2, y, Graphics.FONT_LARGE, status, Graphics.TEXT_JUSTIFY_CENTER);
+    hidden function drawEnabledToggle(dc as Graphics.Dc, w as Number) as Void {
+        var s = _enabled ? "Enabled" : "Disabled";
+        dc.drawText(w / 2, _contentY, Graphics.FONT_SMALL, s, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
-    hidden function drawConfirm(dc as Graphics.Dc, width as Number, y as Number) as Void {
-        dc.drawText(width / 2, y, Graphics.FONT_MEDIUM, "Save Reminder?", Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(width / 2, y + 35, Graphics.FONT_SMALL, _reminderText, Graphics.TEXT_JUSTIFY_CENTER);
-        var schedule = (_reminderType == TYPE_INTERVAL) ? "Every " + INTERVAL_LABELS[_intervalIndex] : "At " + formatTime(_hour, _minute);
-        dc.drawText(width / 2, y + 60, Graphics.FONT_SMALL, schedule, Graphics.TEXT_JUSTIFY_CENTER);
+    hidden function drawConfirm(dc as Graphics.Dc, w as Number) as Void {
+        dc.drawText(w / 2, _contentY, Graphics.FONT_TINY, "Save Reminder?",
+            Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w / 2, _contentY + _rowGap,       Graphics.FONT_TINY, _text,
+            Graphics.TEXT_JUSTIFY_CENTER);
+        var sched = (_type == TYPE_INTERVAL)
+            ? "Every " + INTERVAL_LABELS[_intIdx]
+            : formatTime(_hour, _minute);
+        dc.drawText(w / 2, _contentY + _rowGap + 12,  Graphics.FONT_TINY, sched,
+            Graphics.TEXT_JUSTIFY_CENTER);
     }
 
-    hidden function formatTime(hour as Number, minute as Number) as String {
-        var h = hour < 10 ? "0" + hour : "" + hour;
-        var m = minute < 10 ? "0" + minute : "" + minute;
-        return h + ":" + m;
+    hidden function formatTime(h as Number, m as Number) as String {
+        return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
     }
 
     hidden function getStepTitle() as String {
-        if (_currentStep == STEP_TEXT) { return "Step 1/5: Text"; }
-        if (_currentStep == STEP_TYPE) { return "Step 2/5: Type"; }
-        if (_currentStep == STEP_INTERVAL) { return "Step 3/5: Interval"; }
-        if (_currentStep == STEP_TIME) { return "Step 3/5: Time"; }
-        if (_currentStep == STEP_ENABLED) { return "Step 4/5: Enable"; }
-        if (_currentStep == STEP_CONFIRM) { return "Step 5/5: Confirm"; }
+        var steps = ["Step 1/5: Text", "Step 2/5: Type",
+                     "Step 3/5: Interval", "Step 3/5: Time",
+                     "Step 4/5: Enable", "Step 5/5: Confirm"];
+        if (_step < steps.size()) { return steps[_step]; }
         return "";
     }
 
+    // ── Input handlers ──
+
     function onMenu() as Void {
-        if (_currentStep == STEP_TEXT || _currentStep == STEP_CONFIRM) {
-            nextStep();
-        }
+        if (_step == STEP_TEXT || _step == STEP_CONFIRM) { nextStep(); }
     }
 
     function onSelect() as Void {
-        if (_currentStep == STEP_TEXT) {
-            if (_charIndex < CHARS.length()) {
-                _reminderText = _reminderText + CHARS.substring(_charIndex, _charIndex + 1);
+        if      (_step == STEP_TEXT) {
+            if (_charIdx < CHARS.length()) {
+                _text += CHARS.substring(_charIdx, _charIdx + 1);
             }
-        } else if (_currentStep == STEP_TYPE) {
-            nextStep();
-        } else if (_currentStep == STEP_INTERVAL) {
-            nextStep();
-        } else if (_currentStep == STEP_TIME) {
-            nextStep();
-        } else if (_currentStep == STEP_ENABLED) {
-            _reminderEnabled = !_reminderEnabled;
-        } else if (_currentStep == STEP_CONFIRM) {
-            saveReminder();
-        }
+        } else if (_step == STEP_TYPE     ) { nextStep(); }
+        else if (_step == STEP_INTERVAL   ) { nextStep(); }
+        else if (_step == STEP_TIME       ) { nextStep(); }
+        else if (_step == STEP_ENABLED    ) { _enabled = !_enabled; }
+        else if (_step == STEP_CONFIRM    ) { save(); }
     }
 
     function onUp() as Void {
-        if (_currentStep == STEP_TEXT) {
-            if (_charIndex > 0) { _charIndex--; }
-        } else if (_currentStep == STEP_TYPE) {
-            _reminderType = TYPE_INTERVAL;
-        } else if (_currentStep == STEP_INTERVAL) {
-            if (_intervalIndex > 0) {
-                _intervalIndex--;
-                _reminderInterval = INTERVALS[_intervalIndex];
-            }
-        } else if (_currentStep == STEP_TIME) {
-            if (_charIndex == 0) { _hour = (_hour + 1) % 24; }
-            else { _minute = (_minute + 5) % 60; }
+        if      (_step == STEP_TEXT      ) { if (_charIdx > 0) { _charIdx--; } }
+        else if (_step == STEP_TYPE      ) { _type = TYPE_INTERVAL; }
+        else if (_step == STEP_INTERVAL  ) {
+            if (_intIdx > 0) { _intIdx--; _interval = INTERVALS[_intIdx]; }
+        } else if (_step == STEP_TIME    ) {
+            if (_charIdx == 0) { _hour   = (_hour   + 1) % 24; }
+            else               { _minute = (_minute + 5) % 60; }
         }
         WatchUi.requestUpdate();
     }
 
     function onDown() as Void {
-        if (_currentStep == STEP_TEXT) {
-            if (_charIndex < CHARS.length() - 1) { _charIndex++; }
-        } else if (_currentStep == STEP_TYPE) {
-            _reminderType = TYPE_TIME;
-        } else if (_currentStep == STEP_INTERVAL) {
-            if (_intervalIndex < INTERVALS.size() - 1) {
-                _intervalIndex++;
-                _reminderInterval = INTERVALS[_intervalIndex];
-            }
-        } else if (_currentStep == STEP_TIME) {
-            if (_charIndex == 0) { _hour = (_hour + 23) % 24; }
-            else { _minute = (_minute + 55) % 60; }
+        if      (_step == STEP_TEXT      ) {
+            if (_charIdx < CHARS.length() - 1) { _charIdx++; }
+        } else if (_step == STEP_TYPE      ) { _type = TYPE_TIME; }
+        else if (_step == STEP_INTERVAL  ) {
+            if (_intIdx < INTERVALS.size() - 1) { _intIdx++; _interval = INTERVALS[_intIdx]; }
+        } else if (_step == STEP_TIME    ) {
+            if (_charIdx == 0) { _hour   = (_hour   + 23) % 24; }
+            else               { _minute = (_minute + 55) % 60; }
         }
         WatchUi.requestUpdate();
     }
 
     function onBackPressed() as Boolean {
-        if (_currentStep == STEP_TEXT) {
-            if (_reminderText.length() > 0) {
-                _reminderText = _reminderText.substring(0, _reminderText.length() - 1);
+        if      (_step == STEP_TEXT) {
+            if (_text.length() > 0) {
+                _text = _text.substring(0, _text.length() - 1);
             } else {
                 WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+                return false;
             }
-        } else if (_currentStep == STEP_TYPE) {
-            _currentStep = STEP_TEXT;
-        } else if (_currentStep == STEP_INTERVAL || _currentStep == STEP_TIME) {
-            _currentStep = STEP_TYPE;
-        } else if (_currentStep == STEP_ENABLED) {
-            _currentStep = (_reminderType == TYPE_INTERVAL) ? STEP_INTERVAL : STEP_TIME;
-        } else if (_currentStep == STEP_CONFIRM) {
-            _currentStep = STEP_ENABLED;
-        } else {
-            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-            return false;
-        }
+        } else if (_step == STEP_TYPE     ) { _step = STEP_TEXT; }
+        else if (_step == STEP_INTERVAL ||
+                 _step == STEP_TIME      ) { _step = STEP_TYPE; }
+        else if (_step == STEP_ENABLED   ) {
+            _step = (_type == TYPE_INTERVAL) ? STEP_INTERVAL : STEP_TIME;
+        } else if (_step == STEP_CONFIRM ) { _step = STEP_ENABLED; }
+        else { WatchUi.popView(WatchUi.SLIDE_IMMEDIATE); return false; }
         WatchUi.requestUpdate();
         return true;
     }
 
     hidden function nextStep() as Void {
-        _currentStep++;
-        if (_currentStep == STEP_TIME && _reminderType == TYPE_INTERVAL) {
-            _currentStep = STEP_ENABLED;
-        }
-        if (_currentStep == STEP_INTERVAL && _reminderType == TYPE_TIME) {
-            _currentStep = STEP_TIME;
-        }
+        _step++;
+        if      (_step == STEP_TIME     && _type == TYPE_INTERVAL) { _step = STEP_ENABLED; }
+        else if (_step == STEP_INTERVAL && _type == TYPE_TIME)     { _step = STEP_TIME; }
         WatchUi.requestUpdate();
     }
 
-    hidden function saveReminder() as Void {
-        if (_reminderText == "") { return; }
+    hidden function save() as Void {
+        if (_text.length() == 0) { return; }
+        if (!_store.canAddMore() && _editIdx < 0) { return; }
 
-        // Edge case: max reminders check
-        if (!_store.canAddMore() && _editIndex < 0) {
-            System.println("Max reminders reached");
-            return;
-        }
+        var r = new Reminder();
+        r.text     = _text;
+        r.type     = _type;
+        r.interval = _interval;
+        r.time     = formatTime(_hour, _minute);
+        r.enabled  = _enabled;
 
-        var reminder = new Reminder();
-        reminder.text = _reminderText;
-        reminder.type = _reminderType;
-        reminder.interval = _reminderInterval;
-        reminder.time = formatTime(_hour, _minute);
-        reminder.enabled = _reminderEnabled;
-
-        if (_editIndex >= 0) {
-            var reminders = _store.getReminders();
-            if (_editIndex < reminders.size()) {
-                reminder.id = reminders[_editIndex].id;
-                reminder.lastTriggered = reminders[_editIndex].lastTriggered;
-                _store.updateReminder(reminder);
+        if (_editIdx >= 0) {
+            var rems = _store.getReminders();
+            if (_editIdx < rems.size()) {
+                r.id = rems[_editIdx].id;
+                r.lastTriggered = rems[_editIdx].lastTriggered;
+                _store.updateReminder(r);
             }
         } else {
-            reminder.id = "r_" + System.getTimer();
-            _store.addReminder(reminder);
+            r.id = "r_" + System.getTimer();
+            _store.addReminder(r);
         }
-
         WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
     }
 }
