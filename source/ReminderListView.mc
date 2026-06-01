@@ -122,6 +122,18 @@ class ReminderMenuDelegate extends WatchUi.InputDelegate {
         return false;
     }
 
+    //! Menu2 calls onBack() when Back key is pressed — must be defined
+    //! since we extend InputDelegate rather than Menu2InputDelegate.
+    function onBack() as Void {
+        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+    }
+
+    //! Menu2 calls onWrap() when navigating past the end of the menu.
+    //! Return true to allow wrap-around.
+    function onWrap(key as WatchUi.Key) as Boolean {
+        return true;
+    }
+
     //! Return to the main menu after data changes
     function rebuildAndShow() as Void {
         var newView = new ReminderMenuView(_store);
