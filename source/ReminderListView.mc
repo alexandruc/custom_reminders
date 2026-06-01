@@ -361,7 +361,33 @@ class ReminderContextMenuDelegate extends WatchUi.BehaviorDelegate {
         _index    = index;
     }
 
-    function onSelect() as Boolean {
+    function onKey(keyEvent) as Boolean {
+        var key = keyEvent.getKey();
+
+        if (key == WatchUi.KEY_UP) {
+            _ctxView.moveUp();
+            return true;
+        }
+        if (key == WatchUi.KEY_DOWN) {
+            _ctxView.moveDown();
+            return true;
+        }
+        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
+            doAction();
+            return true;
+        }
+        if (key == WatchUi.KEY_MENU) {
+            doAction();
+            return true;
+        }
+        if (key == WatchUi.KEY_ESC) {
+            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            return true;
+        }
+        return false;
+    }
+
+    hidden function doAction() as Void {
         var opt = _ctxView.getSelectedOption();
         if (opt == 0) {
             // Edit
@@ -372,27 +398,6 @@ class ReminderContextMenuDelegate extends WatchUi.BehaviorDelegate {
             WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
             _listView.removeReminder(_index);
         }
-        return true;
-    }
-
-    function onMenu() as Boolean {
-        // Menu on context menu = same as Select (Edit)
-        return onSelect();
-    }
-
-    function onUp() as Boolean {
-        _ctxView.moveUp();
-        return true;
-    }
-
-    function onDown() as Boolean {
-        _ctxView.moveDown();
-        return true;
-    }
-
-    function onBackPressed() as Boolean {
-        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-        return true;
     }
 }
 
@@ -412,11 +417,30 @@ class ReminderEditDelegate extends WatchUi.BehaviorDelegate {
         _lv = lv;
     }
 
-    function onSelect() as Boolean        { _ev.onSelect();      return true; }
-    function onMenu()   as Boolean        { _ev.onMenu();        return true; }
-    function onUp()     as Boolean        { _ev.onUp();          return true; }
-    function onDown()   as Boolean        { _ev.onDown();        return true; }
-    function onBackPressed() as Boolean   { return _ev.onBackPressed(); }
+    function onKey(keyEvent) as Boolean {
+        var key = keyEvent.getKey();
+
+        if (key == WatchUi.KEY_UP) {
+            _ev.onUp();
+            return true;
+        }
+        if (key == WatchUi.KEY_DOWN) {
+            _ev.onDown();
+            return true;
+        }
+        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
+            _ev.onSelect();
+            return true;
+        }
+        if (key == WatchUi.KEY_MENU) {
+            _ev.onMenu();
+            return true;
+        }
+        if (key == WatchUi.KEY_ESC) {
+            return _ev.onBackPressed();
+        }
+        return false;
+    }
 
     function onViewUncovered(info as WatchUi.ViewInfo) as Void {
         _lv.refresh();

@@ -172,7 +172,8 @@ class ReminderEditView extends WatchUi.View {
 
     function onMenu() as Void {
         System.println("EditView.onMenu step=" + _step);
-        if (_step == STEP_TEXT || _step == STEP_CONFIRM) { nextStep(); }
+        if (_step == STEP_TEXT || _step == STEP_TIME) { nextStep(); }
+        else if (_step == STEP_CONFIRM) { save(); }
     }
 
     function onSelect() as Void {
@@ -181,6 +182,7 @@ class ReminderEditView extends WatchUi.View {
             if (_charIdx < CHARS.length()) {
                 _text += CHARS.substring(_charIdx, _charIdx + 1);
                 System.println("char added, text now: " + _text);
+                WatchUi.requestUpdate();
             }
         } else if (_step == STEP_TYPE     ) { nextStep(); }
         else if (_step == STEP_INTERVAL   ) { nextStep(); }

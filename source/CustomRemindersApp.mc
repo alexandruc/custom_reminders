@@ -70,7 +70,7 @@ class CustomRemindersApp extends Application.AppBase {
     }
 }
 
-//! Delegate for the list view - handles button input
+//! Delegate for the list view - handles button input via onKey
 class ReminderListDelegate extends WatchUi.BehaviorDelegate {
 
     private var _listView as ReminderListView;
@@ -80,30 +80,32 @@ class ReminderListDelegate extends WatchUi.BehaviorDelegate {
         _listView = listView;
     }
 
-    function onMenu() as Boolean {
-        System.println("*** Delegate onMenu called ***");
-        _listView.onMenu();
-        return true;
-    }
+    function onKey(keyEvent) as Boolean {
+        var key = keyEvent.getKey();
 
-    function onSelect() as Boolean {
-        _listView.onSelect();
-        return true;
-    }
-
-    function onUp() as Boolean {
-        System.println("*** Delegate onUp called ***");
-        _listView.onUp();
-        return true;
-    }
-
-    function onDown() as Boolean {
-        System.println("*** Delegate onDown called ***");
-        _listView.onDown();
-        return true;
-    }
-
-    function onBackPressed() as Boolean {
+        if (key == WatchUi.KEY_UP) {
+            System.println("*** Delegate onKey UP ***");
+            _listView.onUp();
+            return true;
+        }
+        if (key == WatchUi.KEY_DOWN) {
+            System.println("*** Delegate onKey DOWN ***");
+            _listView.onDown();
+            return true;
+        }
+        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
+            System.println("*** Delegate onKey ENTER ***");
+            _listView.onSelect();
+            return true;
+        }
+        if (key == WatchUi.KEY_MENU) {
+            System.println("*** Delegate onKey MENU ***");
+            _listView.onMenu();
+            return true;
+        }
+        if (key == WatchUi.KEY_ESC) {
+            return false;
+        }
         return false;
     }
 }
@@ -114,18 +116,21 @@ class AlertDelegate extends WatchUi.BehaviorDelegate {
         BehaviorDelegate.initialize();
     }
 
-    function onSelect() as Boolean {
-        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-        return true;
-    }
+    function onKey(keyEvent) as Boolean {
+        var key = keyEvent.getKey();
 
-    function onMenu() as Boolean {
-        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-        return true;
-    }
-
-    function onBackPressed() as Boolean {
-        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
+            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            return true;
+        }
+        if (key == WatchUi.KEY_MENU) {
+            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            return true;
+        }
+        if (key == WatchUi.KEY_ESC) {
+            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            return false;
+        }
         return false;
     }
 }
