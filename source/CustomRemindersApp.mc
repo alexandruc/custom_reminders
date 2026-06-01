@@ -8,8 +8,6 @@ import Toybox.System;
 class CustomRemindersApp extends Application.AppBase {
 
     private var _reminderStore as ReminderStore?;
-    private var _listView as ReminderListView?;
-    private var _listDelegate as ReminderListDelegate?;
 
     function initialize() {
         AppBase.initialize();
@@ -26,8 +24,11 @@ class CustomRemindersApp extends Application.AppBase {
     function onSettingsChanged() as Void {
         System.println("CustomRemindersApp: settings changed");
         checkPhoneSettings();
-        // Force list view to reload from storage
-        WatchUi.requestUpdate();
+        // Rebuild the menu view to reflect changes
+        var store = getStore();
+        var menuView = new ReminderMenuView(store);
+        var menuDelegate = new ReminderMenuDelegate(store);
+        WatchUi.switchToView(menuView, menuDelegate, WatchUi.SLIDE_IMMEDIATE);
     }
 
     hidden function checkPhoneSettings() as Void {
@@ -50,9 +51,8 @@ class CustomRemindersApp extends Application.AppBase {
     }
 
     function getInitialView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] {
-        _listView = new ReminderListView();
-        _listDelegate = new ReminderListDelegate(_listView);
-        return [_listView, _listDelegate];
+        var store = getStore();
+        return [new ReminderMenuView(store), new ReminderMenuDelegate(store)];
     }
 
     //! Return the shared reminder store, creating it if needed
@@ -70,45 +70,7 @@ class CustomRemindersApp extends Application.AppBase {
     }
 }
 
-//! Delegate for the list view - handles button input via onKey
-class ReminderListDelegate extends WatchUi.BehaviorDelegate {
-
-    private var _listView as ReminderListView;
-
-    function initialize(listView as ReminderListView) {
-        BehaviorDelegate.initialize();
-        _listView = listView;
-    }
-
-    function onKey(keyEvent) as Boolean {
-        var key = keyEvent.getKey();
-
-        if (key == WatchUi.KEY_UP) {
-            System.println("*** Delegate onKey UP ***");
-            _listView.onUp();
-            return true;
-        }
-        if (key == WatchUi.KEY_DOWN) {
-            System.println("*** Delegate onKey DOWN ***");
-            _listView.onDown();
-            return true;
-        }
-        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
-            System.println("*** Delegate onKey ENTER ***");
-            _listView.onSelect();
-            return true;
-        }
-        if (key == WatchUi.KEY_MENU) {
-            System.println("*** Delegate onKey MENU ***");
-            _listView.onMenu();
-            return true;
-        }
-        if (key == WatchUi.KEY_ESC) {
-            return false;
-        }
-        return false;
-    }
-}
+// ReminderMenuDelegate and ReminderMenuView are defined in ReminderListView.mc
 
 class AlertDelegate extends WatchUi.BehaviorDelegate {
 

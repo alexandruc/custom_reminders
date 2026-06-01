@@ -1,302 +1,180 @@
 import Toybox.Lang;
-import Toybox.Application;
 import Toybox.WatchUi;
 import Toybox.Graphics;
 import Toybox.System;
 
-//! Main list view showing reminders with a cursor, toggle on Select,
-//! "Add new" button at end, and context menu (Edit/Remove) on Menu.
-class ReminderListView extends WatchUi.View {
+//! Main list view using Menu2 with ToggleMenuItems for each reminder.
+class ReminderMenuView extends WatchUi.Menu2 {
 
-    private var _store        as ReminderStore?;
-    private var _selIdx       as Number = 0;   // cursor within [0 .. reminders.size()]
-    private var _scrollOfs    as Number = 0;   // first visible item index
-    private var _itemHeight   as Number = 0;
-    private var _headerHeight as Number = 0;
-    private var _contentTop   as Number = 0;
-    private var _contentBot   as Number = 0;
-    private var _maxVisible   as Number = 0;
-    private var _marginSide   as Number = 0;
-    private var _marginTop    as Number = 0;
-    private var _marginBot    as Number = 0;
-    private var _isSmall      as Boolean = false;
+    private var _store as ReminderStore;
 
-    function initialize() {
-        View.initialize();
-        _store = null;
+    function initialize(store as ReminderStore) {
+        Menu2.initialize({:title => "Reminders"});
+        _store = store;
+        buildItems();
     }
 
-    function onShow() as Void {
-        var app = Application.getApp() as CustomRemindersApp;
-        _store = app.getStore();
-        _selIdx = 0;
-        _scrollOfs = 0;
-    }
-
-    // ── layout helpers ──
-
-    hidden function setupLayout(dc as Graphics.Dc) {
-        var w = dc.getWidth();
-        var h = dc.getHeight();
-        var min = w < h ? w : h;
-        _isSmall = (min <= 240);
-
-        _marginTop  = _isSmall ? 35 : 8;
-        _marginBot  = _isSmall ? 40 : 18;
-        _marginSide = _isSmall ? 15 : 5;
-        _headerHeight = _isSmall ? 20 : 28;
-        _itemHeight   = _isSmall ? 30 : 40;
-
-        _contentTop = _marginTop + _headerHeight + 2;
-        _contentBot = h - _marginBot - 2;
-        var usable  = _contentBot - _contentTop;
-        _maxVisible = usable / _itemHeight;
-    }
-
-    // ── draw ──
-
-    function onUpdate(dc as Graphics.Dc) as Void {
-        setupLayout(dc);
-        var w = dc.getWidth();
-        var h = dc.getHeight();
-
-        // Background
-        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.fillRectangle(0, 0, w, h);
-
-        // Header bar
-        dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_BLUE);
-        dc.fillRectangle(0, 0, w, _marginTop + _headerHeight);
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLUE);
-        dc.drawText(w / 2, (_marginTop + _headerHeight) / 2, Graphics.FONT_TINY,
-            "Reminders",
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        var store = _store;
-        if (store == null) { return; }
-        var reminders = store.getReminders();
-        var total = reminders.size() + 1;     // reminders + "Add new"
-
-        // Clamp cursor within valid range
-        if (_selIdx >= total) { _selIdx = total - 1; }
-        if (_selIdx < 0) { _selIdx = 0; }
-
-        // Ensure cursor is visible
-        if (_selIdx < _scrollOfs) { _scrollOfs = _selIdx; }
-        if (_selIdx >= _scrollOfs + _maxVisible) {
-            _scrollOfs = _selIdx - _maxVisible + 1;
-            if (_scrollOfs < 0) { _scrollOfs = 0; }
+    //! (Re)build all menu items from the store
+    function buildItems() as Void {
+        // Clear existing items (not directly supported, so recreate)
+        // Instead we rebuild by removing all and re-adding.
+        // Menu2 doesn't have removeItem(), so we just add items fresh.
+        // Since this is called from initialize, the menu is empty.
+        var reminders = _store.getReminders();
+        for (var i = 0; i < reminders.size(); i++) {
+            var r = reminders[i];
+            var label = r.getDisplayText(20);
+            var item = new WatchUi.ToggleMenuItem(
+                label,
+                null,
+                i.toString(),
+                r.enabled,
+                {}
+            );
+            addItem(item);
         }
+        // Add "Add new" item at the end
+        addItem(new WatchUi.MenuItem(
+            "+ Add new",
+            null,
+            "add_new",
+            {}
+        ));
+    }
 
-        // If total items fit on one screen, center the list vertically
-        var startY = _contentTop;
-        if (total <= _maxVisible) {
-            // Centre the block
-            var blockH = total * _itemHeight;
-            startY = _contentTop + ((_contentBot - _contentTop - blockH) / 2);
-            _scrollOfs = 0;
+    //! Rebuild menu items after data changes (called from delegate)
+    function refresh() as Void {
+        // Menu2 doesn't support removing/replacing items, so we create
+        // a new instance and replace the view on the stack.
+        // This is handled by the delegate calling pushView with a new instance.
+    }
+}
+
+//! Delegate for ReminderMenuView
+class ReminderMenuDelegate extends WatchUi.Menu2InputDelegate {
+
+    private var _store as ReminderStore;
+    private var _lastItemId as String?;
+
+    function initialize(store as ReminderStore) {
+        Menu2InputDelegate.initialize();
+        _store = store;
+        _lastItemId = null;
+    }
+
+    //! Toggle a reminder on/off
+    function onToggle(item as WatchUi.ToggleMenuItem) as Void {
+        var idStr = item.getId() as String;
+        var idx = idStr.toNumber();
+        if (idx != null && idx >= 0 && idx < _store.getReminders().size()) {
+            _store.toggleReminder(idx);
+            _lastItemId = idStr;
         }
+    }
 
-        // Draw each visible item
-        var end = _scrollOfs + _maxVisible;
-        if (end > total) { end = total; }
+    //! Handle selection of a menu item (only fires for non-toggle items like "Add new")
+    function onSelect(item as WatchUi.MenuItem) as Void {
+        var id = item.getId();
+        if (id == "add_new") {
+            pushEditView(-1);
+        }
+        // ToggleMenuItems are handled by onToggle() — ignore them here
+    }
 
-        for (var i = _scrollOfs; i < end; i++) {
-            var iy = startY + (i - _scrollOfs) * _itemHeight;
-            var isCursor = (i == _selIdx);
+    //! Handle Menu button — show context menu for the last-interacted reminder
+    function onKey(keyEvent) as Boolean {
+        var key = keyEvent.getKey();
 
-            if (i < reminders.size()) {
-                drawReminderItem(dc, w, i, iy, isCursor, reminders[i]);
-            } else {
-                drawAddNewItem(dc, w, iy, isCursor);
+        if (key == WatchUi.KEY_MENU) {
+            // Show context menu (Edit/Remove) — use last toggled item or default to 0
+            var reminders = _store.getReminders();
+            if (reminders.size() > 0) {
+                var idx = 0;
+                if (_lastItemId != null) {
+                    var parsed = _lastItemId.toNumber();
+                    if (parsed != null && parsed >= 0 && parsed < reminders.size()) {
+                        idx = parsed;
+                    }
+                }
+                var ctxView = new ReminderContextMenuView2(self, idx);
+                var ctxDelegate = new ReminderContextMenuDelegate2(ctxView, self, idx);
+                WatchUi.pushView(ctxView, ctxDelegate, WatchUi.SLIDE_IMMEDIATE);
             }
+            return true;
         }
+
+        if (key == WatchUi.KEY_ESC) {
+            return false;  // Let Menu2 handle back navigation
+        }
+
+        return false;
     }
 
-    hidden function drawReminderItem(dc as Graphics.Dc, w as Number,
-                                      idx as Number, y as Number,
-                                      isCursor as Boolean, r as Reminder) as Void {
-        // Row background
-        if (isCursor) {
-            dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_BLUE);
-            dc.fillRectangle(_marginSide, y, w - 2 * _marginSide, _itemHeight - 2);
-        } else if (idx % 2 == 0) {
-            dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_DK_GRAY);
-            dc.fillRectangle(_marginSide, y, w - 2 * _marginSide, _itemHeight - 2);
-        }
-
-        // ON/OFF (left side)
-        var cy = y + _itemHeight / 2 - 3;
-        if (r.enabled) {
-            dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_marginSide + 2, cy, Graphics.FONT_TINY, "ON",
-                Graphics.TEXT_JUSTIFY_LEFT);
-        } else {
-            dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(_marginSide + 2, cy, Graphics.FONT_TINY, "OFF",
-                Graphics.TEXT_JUSTIFY_LEFT);
-        }
-
-        // Reminder text
-        dc.setColor(isCursor ? Graphics.COLOR_BLACK : Graphics.COLOR_WHITE,
-                    Graphics.COLOR_TRANSPARENT);
-        dc.drawText(_marginSide + 22, cy, Graphics.FONT_TINY,
-            r.getDisplayText(16), Graphics.TEXT_JUSTIFY_LEFT);
-
-        // Schedule description
-        dc.setColor(isCursor ? Graphics.COLOR_DK_GRAY : Graphics.COLOR_LT_GRAY,
-                    Graphics.COLOR_TRANSPARENT);
-        dc.drawText(_marginSide + 22, cy + 9, Graphics.FONT_TINY,
-            r.getScheduleDescription(), Graphics.TEXT_JUSTIFY_LEFT);
+    //! Return to the main menu after data changes
+    function rebuildAndShow() as Void {
+        var newView = new ReminderMenuView(_store);
+        var newDelegate = new ReminderMenuDelegate(_store);
+        WatchUi.switchToView(newView, newDelegate, WatchUi.SLIDE_IMMEDIATE);
     }
 
-    hidden function drawAddNewItem(dc as Graphics.Dc, w as Number,
-                                    y as Number, isCursor as Boolean) as Void {
-        // Distinct button style: blue background when cursor, dark gray otherwise
-        if (isCursor) {
-            dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_BLUE);
-        } else {
-            dc.setColor(0x333333, 0x333333);
-        }
-        dc.fillRectangle(_marginSide, y, w - 2 * _marginSide, _itemHeight - 2);
-
-        // Dashed top line to separate from reminders
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(_marginSide + 4, y, w - _marginSide - 4, y);
-
-        // "+ Add new" centered
-        var cy = y + _itemHeight / 2;
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, cy, Graphics.FONT_TINY, "+ Add new",
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-    }
-
-    // ── input handlers ──
-
-    function onSelect() as Void {
-        var store = _store;
-        if (store == null) { return; }
-        var reminders = store.getReminders();
-
-        if (_selIdx < reminders.size()) {
-            // Toggle reminder
-            store.toggleReminder(_selIdx);
-            WatchUi.requestUpdate();
-        } else {
-            // Open add-new wizard
-            pushEditView(-1);
-        }
-    }
-
-    function onMenu() as Void {
-        System.println("onMenu called");
-        var store = _store;
-        if (store == null) { System.println("store is null"); return; }
-        var reminders = store.getReminders();
-        System.println("reminders.size=" + reminders.size() + " selIdx=" + _selIdx);
-
-        if (_selIdx < reminders.size()) {
-            System.println("Showing context menu for reminder " + _selIdx);
-            var ctxView  = new ReminderContextMenuView(self, _selIdx);
-            var ctxDelegate = new ReminderContextMenuDelegate(ctxView, self, _selIdx);
-            WatchUi.pushView(ctxView, ctxDelegate, WatchUi.SLIDE_IMMEDIATE);
-            System.println("Context menu pushed");
-        } else {
-            System.println("Opening add-new wizard");
-            pushEditView(-1);
-        }
-    }
-
-    function onUp() as Void {
-        if (_selIdx > 0) {
-            _selIdx--;
-            WatchUi.requestUpdate();
-        }
-    }
-
-    function onDown() as Void {
-        var store = _store;
-        if (store == null) { return; }
-        var total = store.getReminders().size() + 1;  // reminders + "Add new"
-        if (_selIdx < total - 1) {
-            _selIdx++;
-            WatchUi.requestUpdate();
-        }
-    }
-
-    // ── public helpers called by delegate / context menu ──
-
+    //! Push the edit wizard
     function pushEditView(index as Number) as Void {
         System.println("pushEditView called, index=" + index);
-        var store = _store;
-        if (store == null) { System.println("store is null"); return; }
-        System.println("Creating ReminderEditView");
-        var ev = new ReminderEditView(store, index);
-        var ed = new ReminderEditDelegate(ev, self);
-        System.println("Pushing edit view");
+        var ev = new ReminderEditView(_store, index);
+        var ed = new ReminderEditDelegate2(ev, self);
         WatchUi.pushView(ev, ed, WatchUi.SLIDE_IMMEDIATE);
-        System.println("pushEditView done");
     }
 
+    //! Remove a reminder by index
     function removeReminder(index as Number) as Void {
-        var store = _store;
-        if (store == null) { return; }
-        store.removeReminder(index);
-        var total = store.getReminders().size() + 1;
-        if (_selIdx >= total) { _selIdx = total - 1; }
-        if (_selIdx < 0) { _selIdx = 0; }
-        WatchUi.requestUpdate();
+        if (index >= 0 && index < _store.getReminders().size()) {
+            _store.removeReminder(index);
+            rebuildAndShow();
+        }
     }
 
-    function refresh() as Void {
-        var store = _store;
-        if (store != null) { store.loadFromStorage(); }
-        var total = (_store != null) ? _store.getReminders().size() + 1 : 1;
-        if (_selIdx >= total) { _selIdx = total - 1; }
-        if (_selIdx < 0) { _selIdx = 0; }
-        WatchUi.requestUpdate();
+    //! Get the reminder store
+    function getStore() as ReminderStore {
+        return _store;
     }
 }
 
 // ──────────────────────────────────────────────
 //  Context menu view (Edit / Remove)
-//  Custom drawn because WatchUi.Menu is not
-//  available in SDK 3.3 (API 3.1.0).
 // ──────────────────────────────────────────────
 
-class ReminderContextMenuView extends WatchUi.View {
+class ReminderContextMenuView2 extends WatchUi.View {
 
-    private var _listView as ReminderListView;
+    private var _delegate as ReminderMenuDelegate;
     private var _index    as Number;
-    private var _selOption as Number = 0;  // 0 = Edit, 1 = Remove
+    private var _selOption as Number = 0;
 
     const OPTIONS = ["Edit", "Remove"];
 
-    function initialize(listView as ReminderListView, index as Number) {
+    function initialize(delegate as ReminderMenuDelegate, index as Number) {
         View.initialize();
-        _listView = listView;
+        _delegate = delegate;
         _index    = index;
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
         var w = dc.getWidth();
         var h = dc.getHeight();
-        var isSmall = ((w < h ? w : h) <= 240);
-
-        var marginT = isSmall ? 35 : 15;
-        var marginB = isSmall ? 40 : 18;
-        var marginX = isSmall ? 15 : 5;
-        var rowH    = isSmall ? 30 : 40;
 
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.fillRectangle(0, 0, w, h);
 
-        // Title
+        // Show which reminder this is for
+        var reminders = _delegate.getStore().getReminders();
+        var label = (_index >= 0 && _index < reminders.size())
+            ? reminders[_index].getDisplayText(20) : "";
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, marginT + 2, Graphics.FONT_TINY, "Options",
+        dc.drawText(w / 2, h * 0.12, Graphics.FONT_TINY, label,
             Graphics.TEXT_JUSTIFY_CENTER);
 
-        var startY = marginT + 26;
+        var startY = h * 0.25;
+        var rowH = 40;
+
         for (var i = 0; i < OPTIONS.size(); i++) {
             var iy = startY + i * rowH;
             var isSel = (i == _selOption);
@@ -308,7 +186,7 @@ class ReminderContextMenuView extends WatchUi.View {
             } else {
                 dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
             }
-            dc.fillRectangle(marginX, iy, w - 2 * marginX, rowH - 2);
+            dc.fillRectangle(5, iy, w - 10, rowH - 2);
 
             dc.setColor(
                 isSel ? Graphics.COLOR_BLACK : Graphics.COLOR_WHITE,
@@ -318,7 +196,6 @@ class ReminderContextMenuView extends WatchUi.View {
         }
     }
 
-    // Called by delegate
     function moveUp() as Void {
         _selOption = 0;
         WatchUi.requestUpdate();
@@ -333,8 +210,8 @@ class ReminderContextMenuView extends WatchUi.View {
         return _selOption;
     }
 
-    function getListView() as ReminderListView {
-        return _listView;
+    function getDelegate() as ReminderMenuDelegate {
+        return _delegate;
     }
 
     function getReminderIndex() as Number {
@@ -346,18 +223,18 @@ class ReminderContextMenuView extends WatchUi.View {
 //  Context menu delegate
 // ──────────────────────────────────────────────
 
-class ReminderContextMenuDelegate extends WatchUi.BehaviorDelegate {
+class ReminderContextMenuDelegate2 extends WatchUi.BehaviorDelegate {
 
-    private var _ctxView  as ReminderContextMenuView;
-    private var _listView as ReminderListView;
+    private var _ctxView  as ReminderContextMenuView2;
+    private var _menuDelegate as ReminderMenuDelegate;
     private var _index    as Number;
 
-    function initialize(ctxView as ReminderContextMenuView,
-                        listView as ReminderListView,
+    function initialize(ctxView as ReminderContextMenuView2,
+                        menuDelegate as ReminderMenuDelegate,
                         index as Number) {
         BehaviorDelegate.initialize();
         _ctxView  = ctxView;
-        _listView = listView;
+        _menuDelegate = menuDelegate;
         _index    = index;
     }
 
@@ -389,32 +266,31 @@ class ReminderContextMenuDelegate extends WatchUi.BehaviorDelegate {
 
     hidden function doAction() as Void {
         var opt = _ctxView.getSelectedOption();
+        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
         if (opt == 0) {
             // Edit
-            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-            _listView.pushEditView(_index);
+            _menuDelegate.pushEditView(_index);
         } else {
             // Remove
-            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-            _listView.removeReminder(_index);
+            _menuDelegate.removeReminder(_index);
         }
     }
 }
 
 // ──────────────────────────────────────────────
-//  Delegate that forwards button events to the
-//  ReminderEditView while it is active.
+//  Edit view delegate — bridges ReminderEditView
+//  with the ReminderMenuDelegate
 // ──────────────────────────────────────────────
 
-class ReminderEditDelegate extends WatchUi.BehaviorDelegate {
+class ReminderEditDelegate2 extends WatchUi.BehaviorDelegate {
 
     private var _ev as ReminderEditView;
-    private var _lv as ReminderListView;
+    private var _menuDelegate as ReminderMenuDelegate;
 
-    function initialize(ev as ReminderEditView, lv as ReminderListView) {
+    function initialize(ev as ReminderEditView, menuDelegate as ReminderMenuDelegate) {
         BehaviorDelegate.initialize();
         _ev = ev;
-        _lv = lv;
+        _menuDelegate = menuDelegate;
     }
 
     function onKey(keyEvent) as Boolean {
@@ -443,6 +319,7 @@ class ReminderEditDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onViewUncovered(info as WatchUi.ViewInfo) as Void {
-        _lv.refresh();
+        // After returning from edit, rebuild the menu view
+        _menuDelegate.rebuildAndShow();
     }
 }
