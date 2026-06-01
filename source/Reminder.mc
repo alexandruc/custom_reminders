@@ -37,7 +37,8 @@ class Reminder {
             if (lastTriggered == null) {
                 return true;
             }
-            var elapsed = System.getTimer() - lastTriggered;
+            var nowEpoch = Time.now().value();
+            var elapsed = nowEpoch - lastTriggered;
             return (elapsed >= interval);
         } else if (type == TYPE_TIME) {
             if (time == null) {
@@ -60,7 +61,8 @@ class Reminder {
                 if (lastTriggered == null) {
                     return true;
                 }
-                return (System.getTimer() - lastTriggered) > 60;
+                var nowEpoch = Time.now().value();
+                return (nowEpoch - lastTriggered) > 60;
             }
             return false;
         }
@@ -68,7 +70,7 @@ class Reminder {
     }
 
     function markTriggered() as Void {
-        lastTriggered = System.getTimer();
+        lastTriggered = Time.now().value();
     }
 
     function getScheduleDescription() as String {

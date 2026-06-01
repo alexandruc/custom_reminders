@@ -85,11 +85,11 @@ class ReminderBackgroundService extends System.ServiceDelegate {
                 var lastTriggered = Storage.getValue(prefix + "_lastTriggered");
                 if (interval == null) { continue; }
 
-                var nowTimer = System.getTimer();
+                var nowEpoch = Time.now().value();
                 if (lastTriggered == null) {
                     fired = true;
                 } else {
-                    var elapsed = nowTimer - (lastTriggered as Number);
+                    var elapsed = nowEpoch - (lastTriggered as Number);
                     if (elapsed >= (interval as Number)) {
                         fired = true;
                     }
@@ -108,8 +108,8 @@ class ReminderBackgroundService extends System.ServiceDelegate {
                                 if (lastTriggered == null) {
                                     fired = true;
                                 } else {
-                                    var nowTimer = System.getTimer();
-                                    if (nowTimer - (lastTriggered as Number) > 60) {
+                                    var nowEpoch = Time.now().value();
+                                    if (nowEpoch - (lastTriggered as Number) > 60) {
                                         fired = true;
                                     }
                                 }
@@ -127,7 +127,7 @@ class ReminderBackgroundService extends System.ServiceDelegate {
                 }
 
                 // Update last triggered
-                Storage.setValue(prefix + "_lastTriggered", System.getTimer());
+                Storage.setValue(prefix + "_lastTriggered", Time.now().value());
 
                 // Wake the app to show alert and play vibration
                 try {

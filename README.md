@@ -227,7 +227,7 @@ Each reminder triggers a **randomized haptic pattern**:
 - **FR245** requires SDK 3.3 (not SDK 9.x) for compilation
 - **Long text** is truncated to ~20 characters in the list view
 - **No snooze** — dismissing a reminder clears it until the next interval
-- **No delete on watch** — delete via phone companion settings
+- **Delete via context menu** — press Menu on a reminder to see Edit/Remove options
 - **Minimum interval** of 5 minutes due to background timer constraints
 
 ## Troubleshooting

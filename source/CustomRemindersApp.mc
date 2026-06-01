@@ -26,6 +26,8 @@ class CustomRemindersApp extends Application.AppBase {
     function onSettingsChanged() as Void {
         System.println("CustomRemindersApp: settings changed");
         checkPhoneSettings();
+        // Force list view to reload from storage
+        WatchUi.requestUpdate();
     }
 
     hidden function checkPhoneSettings() as Void {
@@ -53,6 +55,15 @@ class CustomRemindersApp extends Application.AppBase {
         return [_listView, _listDelegate];
     }
 
+    //! Return the shared reminder store, creating it if needed
+    function getStore() as ReminderStore {
+        if (_reminderStore == null) {
+            _reminderStore = new ReminderStore();
+            _reminderStore.loadFromStorage();
+        }
+        return _reminderStore;
+    }
+
     //! Return service delegate for background processing
     function getServiceDelegate() as [System.ServiceDelegate] {
         return [new ReminderBackgroundService()];
@@ -70,6 +81,7 @@ class ReminderListDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onMenu() as Boolean {
+        System.println("*** Delegate onMenu called ***");
         _listView.onMenu();
         return true;
     }
@@ -80,11 +92,13 @@ class ReminderListDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onUp() as Boolean {
+        System.println("*** Delegate onUp called ***");
         _listView.onUp();
         return true;
     }
 
     function onDown() as Boolean {
+        System.println("*** Delegate onDown called ***");
         _listView.onDown();
         return true;
     }

@@ -16,20 +16,6 @@ class ReminderAlertView extends WatchUi.View {
         _scheduleInfo = scheduleInfo;
     }
 
-    function onLayout(dc as Graphics.Dc) as Void {
-        setLayout(Rez.Layouts.ReminderAlertLayout(dc));
-    }
-
-    function onShow() as Void {
-        var label = View.findDrawableById("ReminderText");
-        if (label != null) {
-            var txt = label as WatchUi.Text;
-            if (txt != null) {
-                txt.setText(_reminderText);
-            }
-        }
-    }
-
     function onUpdate(dc as Graphics.Dc) as Void {
         var width = dc.getWidth();
         var height = dc.getHeight();
@@ -67,16 +53,5 @@ class ReminderAlertView extends WatchUi.View {
         }
     }
 
-    function onMenu() as Void {
-        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-    }
-
-    function onSelect() as Void {
-        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-    }
-
-    function onBackPressed() as Boolean {
-        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-        return false;
-    }
+    // Input handled by AlertDelegate
 }

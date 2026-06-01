@@ -3,15 +3,15 @@ import Toybox.WatchUi;
 import Toybox.Graphics;
 import Toybox.System;
 
-//! Wizard view for adding/editing reminders with clean spacing
+//! Wizard view for adding/editing reminders (4 steps: Text → Type →
+//! Interval/Time → Confirm).  ON/OFF toggling is done from the list view.
 class ReminderEditView extends WatchUi.View {
 
     const STEP_TEXT     = 0;
     const STEP_TYPE     = 1;
     const STEP_INTERVAL = 2;
     const STEP_TIME     = 3;
-    const STEP_ENABLED  = 4;
-    const STEP_CONFIRM  = 5;
+    const STEP_CONFIRM  = 4;
 
     const CHARS = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,!?-_";
     const INTERVALS = [300, 900, 1800, 3600, 7200];
@@ -27,10 +27,10 @@ class ReminderEditView extends WatchUi.View {
     private var _text      as String = "";
     private var _type      as Number = 0;
     private var _interval  as Number = 3600;
-    private var _enabled   as Boolean = true;
-    private var _charIdx   as Number = 0;
-    private var _hour      as Number = 14;
-    private var _minute    as Number = 0;
+    private var _charIdx      as Number = 0;
+    private var _timeFieldIdx as Number = 0; // 0=hours, 1=minutes
+    private var _hour         as Number = 14;
+    private var _minute       as Number = 0;
     private var _intIdx    as Number = 3;
 
     // Layout
@@ -42,9 +42,9 @@ class ReminderEditView extends WatchUi.View {
 
     function initialize(store as ReminderStore, editIdx as Number) {
         View.initialize();
-        _store  = store;
+        _store   = store;
         _editIdx = editIdx;
-        _step   = STEP_TEXT;
+        _step    = STEP_TEXT;
 
         if (editIdx >= 0) {
             var rem = _store.getReminders();
@@ -53,7 +53,6 @@ class ReminderEditView extends WatchUi.View {
                 _text    = r.text;
                 _type    = r.type;
                 _interval = r.interval;
-                _enabled  = r.enabled;
                 for (var i = 0; i < INTERVALS.size(); i++) {
                     if (INTERVALS[i] == _interval) { _intIdx = i; break; }
                 }
@@ -65,33 +64,29 @@ class ReminderEditView extends WatchUi.View {
         var w = dc.getWidth();
         var h = dc.getHeight();
         _isSmall = ((w < h ? w : h) <= 240);
-        var isRound = (w == h);
 
         _marginT = _isSmall ? 35 : 15;
-        _marginB = _isSmall ? 42 : 20;
+        _marginB = _isSmall ? 40 : 18;
         _rowGap  = _isSmall ? 20 : 32;
         _contentY = _marginT + 24;
 
-        // ── Background ──
+        // Background
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.fillRectangle(0, 0, w, h);
 
-        // ── Step title ──
+        // Step title
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(w / 2, _marginT + 2, Graphics.FONT_TINY, getStepTitle(),
             Graphics.TEXT_JUSTIFY_CENTER);
 
-        // ── Step content ──
+        // Step content
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
 
         if      (_step == STEP_TEXT)     { drawTextInput(dc, w); }
         else if (_step == STEP_TYPE)     { drawTypeSelect(dc, w); }
         else if (_step == STEP_INTERVAL) { drawIntervalSelect(dc, w); }
         else if (_step == STEP_TIME)     { drawTimeSelect(dc, w); }
-        else if (_step == STEP_ENABLED)  { drawEnabledToggle(dc, w); }
         else if (_step == STEP_CONFIRM)  { drawConfirm(dc, w); }
-
-
     }
 
     hidden function drawTextInput(dc as Graphics.Dc, w as Number) as Void {
@@ -108,10 +103,23 @@ class ReminderEditView extends WatchUi.View {
     }
 
     hidden function drawTypeSelect(dc as Graphics.Dc, w as Number) as Void {
-        var iLabel = (_type == TYPE_INTERVAL ? "► " : "  ") + "Interval";
-        var tLabel = (_type == TYPE_TIME    ? "► " : "  ") + "Time of Day";
-        dc.drawText(w / 2, _contentY, Graphics.FONT_TINY, iLabel, Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(w / 2, _contentY + _rowGap, Graphics.FONT_TINY, tLabel, Graphics.TEXT_JUSTIFY_CENTER);
+        // Use green color for selected option ("►" and similar chars not
+        // available on FR245 font set)
+        if (_type == TYPE_INTERVAL) {
+            dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(w / 2, _contentY, Graphics.FONT_TINY, "> Interval",
+                Graphics.TEXT_JUSTIFY_CENTER);
+            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(w / 2, _contentY + _rowGap, Graphics.FONT_TINY, "  Time of Day",
+                Graphics.TEXT_JUSTIFY_CENTER);
+        } else {
+            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(w / 2, _contentY, Graphics.FONT_TINY, "  Interval",
+                Graphics.TEXT_JUSTIFY_CENTER);
+            dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(w / 2, _contentY + _rowGap, Graphics.FONT_TINY, "> Time of Day",
+                Graphics.TEXT_JUSTIFY_CENTER);
+        }
     }
 
     hidden function drawIntervalSelect(dc as Graphics.Dc, w as Number) as Void {
@@ -125,7 +133,7 @@ class ReminderEditView extends WatchUi.View {
             dc.setColor(
                 i == _intIdx ? Graphics.COLOR_GREEN : Graphics.COLOR_WHITE,
                 Graphics.COLOR_TRANSPARENT);
-            var prefix = i == _intIdx ? "► " : "  ";
+            var prefix = i == _intIdx ? "> " : "  ";
             dc.drawText(w / 2, ry, Graphics.FONT_TINY, prefix + INTERVAL_LABELS[i],
                 Graphics.TEXT_JUSTIFY_CENTER);
         }
@@ -136,20 +144,15 @@ class ReminderEditView extends WatchUi.View {
             formatTime(_hour, _minute), Graphics.TEXT_JUSTIFY_CENTER);
     }
 
-    hidden function drawEnabledToggle(dc as Graphics.Dc, w as Number) as Void {
-        var s = _enabled ? "Enabled" : "Disabled";
-        dc.drawText(w / 2, _contentY, Graphics.FONT_SMALL, s, Graphics.TEXT_JUSTIFY_CENTER);
-    }
-
     hidden function drawConfirm(dc as Graphics.Dc, w as Number) as Void {
         dc.drawText(w / 2, _contentY, Graphics.FONT_TINY, "Save Reminder?",
             Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(w / 2, _contentY + _rowGap,       Graphics.FONT_TINY, _text,
+        dc.drawText(w / 2, _contentY + _rowGap, Graphics.FONT_TINY, _text,
             Graphics.TEXT_JUSTIFY_CENTER);
         var sched = (_type == TYPE_INTERVAL)
             ? "Every " + INTERVAL_LABELS[_intIdx]
             : formatTime(_hour, _minute);
-        dc.drawText(w / 2, _contentY + _rowGap + 12,  Graphics.FONT_TINY, sched,
+        dc.drawText(w / 2, _contentY + _rowGap + 12, Graphics.FONT_TINY, sched,
             Graphics.TEXT_JUSTIFY_CENTER);
     }
 
@@ -158,9 +161,9 @@ class ReminderEditView extends WatchUi.View {
     }
 
     hidden function getStepTitle() as String {
-        var steps = ["Step 1/5: Text", "Step 2/5: Type",
-                     "Step 3/5: Interval", "Step 3/5: Time",
-                     "Step 4/5: Enable", "Step 5/5: Confirm"];
+        var steps = ["Step 1/4: Text", "Step 2/4: Type",
+                     "Step 3/4: Interval", "Step 3/4: Time",
+                     "Step 4/4: Confirm"];
         if (_step < steps.size()) { return steps[_step]; }
         return "";
     }
@@ -168,68 +171,75 @@ class ReminderEditView extends WatchUi.View {
     // ── Input handlers ──
 
     function onMenu() as Void {
+        System.println("EditView.onMenu step=" + _step);
         if (_step == STEP_TEXT || _step == STEP_CONFIRM) { nextStep(); }
     }
 
     function onSelect() as Void {
+        System.println("EditView.onSelect step=" + _step);
         if      (_step == STEP_TEXT) {
             if (_charIdx < CHARS.length()) {
                 _text += CHARS.substring(_charIdx, _charIdx + 1);
+                System.println("char added, text now: " + _text);
             }
         } else if (_step == STEP_TYPE     ) { nextStep(); }
         else if (_step == STEP_INTERVAL   ) { nextStep(); }
-        else if (_step == STEP_TIME       ) { nextStep(); }
-        else if (_step == STEP_ENABLED    ) { _enabled = !_enabled; }
+        else if (_step == STEP_TIME       ) { _timeFieldIdx = (_timeFieldIdx + 1) % 2; }
         else if (_step == STEP_CONFIRM    ) { save(); }
     }
 
     function onUp() as Void {
+        System.println("EditView.onUp step=" + _step);
         if      (_step == STEP_TEXT      ) { if (_charIdx > 0) { _charIdx--; } }
-        else if (_step == STEP_TYPE      ) { _type = TYPE_INTERVAL; }
+        else if (_step == STEP_TYPE      ) { _type = TYPE_INTERVAL; System.println("  type=INTERVAL"); }
         else if (_step == STEP_INTERVAL  ) {
-            if (_intIdx > 0) { _intIdx--; _interval = INTERVALS[_intIdx]; }
+            if (_intIdx > 0) { _intIdx--; _interval = INTERVALS[_intIdx]; System.println("  interval=" + _interval); }
         } else if (_step == STEP_TIME    ) {
-            if (_charIdx == 0) { _hour   = (_hour   + 1) % 24; }
-            else               { _minute = (_minute + 5) % 60; }
+            if (_timeFieldIdx == 0) { _hour   = (_hour   + 1) % 24; }
+            else                    { _minute = (_minute + 5) % 60; }
         }
         WatchUi.requestUpdate();
     }
 
     function onDown() as Void {
+        System.println("EditView.onDown step=" + _step);
         if      (_step == STEP_TEXT      ) {
             if (_charIdx < CHARS.length() - 1) { _charIdx++; }
-        } else if (_step == STEP_TYPE      ) { _type = TYPE_TIME; }
+        } else if (_step == STEP_TYPE      ) { _type = TYPE_TIME; System.println("  type=TIME"); }
         else if (_step == STEP_INTERVAL  ) {
-            if (_intIdx < INTERVALS.size() - 1) { _intIdx++; _interval = INTERVALS[_intIdx]; }
+            if (_intIdx < INTERVALS.size() - 1) { _intIdx++; _interval = INTERVALS[_intIdx]; System.println("  interval=" + _interval); }
         } else if (_step == STEP_TIME    ) {
-            if (_charIdx == 0) { _hour   = (_hour   + 23) % 24; }
-            else               { _minute = (_minute + 55) % 60; }
+            if (_timeFieldIdx == 0) { _hour   = (_hour   + 23) % 24; }
+            else                    { _minute = (_minute + 55) % 60; }
         }
         WatchUi.requestUpdate();
     }
 
     function onBackPressed() as Boolean {
-        if      (_step == STEP_TEXT) {
+        if (_step == STEP_TEXT) {
             if (_text.length() > 0) {
                 _text = _text.substring(0, _text.length() - 1);
             } else {
                 WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
                 return false;
             }
-        } else if (_step == STEP_TYPE     ) { _step = STEP_TEXT; }
-        else if (_step == STEP_INTERVAL ||
-                 _step == STEP_TIME      ) { _step = STEP_TYPE; }
-        else if (_step == STEP_ENABLED   ) {
+        } else if (_step == STEP_TYPE) {
+            _step = STEP_TEXT;
+        } else if (_step == STEP_INTERVAL || _step == STEP_TIME) {
+            _step = STEP_TYPE;
+        } else if (_step == STEP_CONFIRM) {
             _step = (_type == TYPE_INTERVAL) ? STEP_INTERVAL : STEP_TIME;
-        } else if (_step == STEP_CONFIRM ) { _step = STEP_ENABLED; }
-        else { WatchUi.popView(WatchUi.SLIDE_IMMEDIATE); return false; }
+        } else {
+            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            return false;
+        }
         WatchUi.requestUpdate();
         return true;
     }
 
     hidden function nextStep() as Void {
         _step++;
-        if      (_step == STEP_TIME     && _type == TYPE_INTERVAL) { _step = STEP_ENABLED; }
+        if      (_step == STEP_TIME     && _type == TYPE_INTERVAL) { _step = STEP_CONFIRM; }
         else if (_step == STEP_INTERVAL && _type == TYPE_TIME)     { _step = STEP_TIME; }
         WatchUi.requestUpdate();
     }
@@ -243,13 +253,14 @@ class ReminderEditView extends WatchUi.View {
         r.type     = _type;
         r.interval = _interval;
         r.time     = formatTime(_hour, _minute);
-        r.enabled  = _enabled;
+        r.enabled  = true;   // toggled from list view
 
         if (_editIdx >= 0) {
             var rems = _store.getReminders();
             if (_editIdx < rems.size()) {
                 r.id = rems[_editIdx].id;
                 r.lastTriggered = rems[_editIdx].lastTriggered;
+                r.enabled  = rems[_editIdx].enabled;   // preserve existing
                 _store.updateReminder(r);
             }
         } else {
