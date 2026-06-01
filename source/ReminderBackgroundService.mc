@@ -126,8 +126,23 @@ class ReminderBackgroundService extends System.ServiceDelegate {
                     displayText = text as String;
                 }
 
+                var scheduleInfo = "";
+                if (rType == TYPE_INTERVAL) {
+                    var mins = (Storage.getValue(prefix + "_interval") as Number) / 60;
+                    scheduleInfo = "Every " + mins + " min";
+                } else if (rType == TYPE_TIME) {
+                    var t = Storage.getValue(prefix + "_time");
+                    if (t != null) {
+                        scheduleInfo = "At " + (t as String);
+                    }
+                }
+
                 // Update last triggered
                 Storage.setValue(prefix + "_lastTriggered", Time.now().value());
+
+                // Store fired info for the foreground app to read
+                Storage.setValue("last_fired_text", displayText);
+                Storage.setValue("last_fired_schedule", scheduleInfo);
 
                 // Wake the app to show alert and play vibration
                 try {

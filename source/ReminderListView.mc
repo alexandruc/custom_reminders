@@ -3,7 +3,7 @@ import Toybox.WatchUi;
 import Toybox.Graphics;
 import Toybox.System;
 
-//! Main list view using Menu2 with ToggleMenuItems for each reminder.
+//! Main list view using Menu2 with MenuItems for each reminder.
 class ReminderMenuView extends WatchUi.Menu2 {
 
     private var _store as ReminderStore;
@@ -14,26 +14,23 @@ class ReminderMenuView extends WatchUi.Menu2 {
         buildItems();
     }
 
-    //! (Re)build all menu items from the store
     function buildItems() as Void {
-        // Clear existing items (not directly supported, so recreate)
-        // Instead we rebuild by removing all and re-adding.
-        // Menu2 doesn't have removeItem(), so we just add items fresh.
-        // Since this is called from initialize, the menu is empty.
         var reminders = _store.getReminders();
         for (var i = 0; i < reminders.size(); i++) {
             var r = reminders[i];
-            var label = r.getDisplayText(20);
-            var item = new WatchUi.ToggleMenuItem(
+            var label = r.getDisplayText(16);
+            if (!r.enabled) {
+                label = label + " (off)";
+            }
+            var sub = r.getScheduleDescription();
+            var item = new WatchUi.MenuItem(
                 label,
-                null,
+                sub,
                 i.toString(),
-                r.enabled,
                 {}
             );
             addItem(item);
         }
-        // Add "Add new" item at the end
         addItem(new WatchUi.MenuItem(
             "+ Add new",
             null,
@@ -42,52 +39,39 @@ class ReminderMenuView extends WatchUi.Menu2 {
         ));
     }
 
-    //! Rebuild menu items after data changes (called from delegate)
     function refresh() as Void {
-        // Menu2 doesn't support removing/replacing items, so we create
-        // a new instance and replace the view on the stack.
-        // This is handled by the delegate calling pushView with a new instance.
     }
 }
 
 //! Delegate for ReminderMenuView.
-//! Extends InputDelegate (rather than Menu2InputDelegate) because
-//! Menu2InputDelegate inherits from Object, not InputDelegate, and does
-//! not support onKey(). InputDelegate provides onKey(), and the Menu2
-//! runtime dispatches onSelect(item) / onToggle(item) by method signature
-//! regardless of the delegate's parent class.
+//! Extends InputDelegate so onKey() works for KEY_START.
+//! Menu2 dispatches onSelect(item) by method signature.
 class ReminderMenuDelegate extends WatchUi.InputDelegate {
 
     private var _store as ReminderStore;
-    private var _lastItemId as String?;
 
     function initialize(store as ReminderStore) {
         InputDelegate.initialize();
         _store = store;
-        _lastItemId = null;
     }
 
-    //! Toggle a reminder on/off
-    function onToggle(item as WatchUi.ToggleMenuItem) as Void {
-        var idStr = item.getId() as String;
-        var idx = idStr.toNumber();
-        if (idx != null && idx >= 0 && idx < _store.getReminders().size()) {
-            _store.toggleReminder(idx);
-            _lastItemId = idStr;
-        }
-    }
-
-    //! Handle selection of a menu item (only fires for non-toggle items like "Add new")
+    //! Handle selection of a menu item.
     function onSelect(item as WatchUi.MenuItem) as Void {
-        var id = item.getId();
-        System.println("MenuDelegate.onSelect: " + id);
-        _lastItemId = id as String?;
-        if (_lastItemId != null && _lastItemId.equals("add_new")) {
+        var idStr = item.getId() as String;
+        System.println("MenuDelegate.onSelect: " + idStr);
+
+        if (idStr != null && idStr.equals("add_new")) {
             pushEditView(-1);
+            return;
+        }
+
+        var idx = (idStr as String).toNumber();
+        if (idx != null && idx >= 0 && idx < _store.getReminders().size()) {
+            showReminderActions(idx);
         }
     }
 
-    //! Raw key handler — receives keys that Menu2 does not consume internally
+    //! Raw key handler — receives keys that Menu2 does not consume internally.
     function onKey(keyEvent) as Boolean {
         var key = keyEvent.getKey();
         System.println("MenuDelegate.onKey: key=" + key);
@@ -98,23 +82,6 @@ class ReminderMenuDelegate extends WatchUi.InputDelegate {
             return true;
         }
 
-        if (key == WatchUi.KEY_MENU) {
-            var reminders = _store.getReminders();
-            if (reminders.size() > 0) {
-                var idx = 0;
-                if (_lastItemId != null) {
-                    var parsed = _lastItemId.toNumber();
-                    if (parsed != null && parsed >= 0 && parsed < reminders.size()) {
-                        idx = parsed;
-                    }
-                }
-                var ctxView = new ReminderContextMenuView2(self, idx);
-                var ctxDelegate = new ReminderContextMenuDelegate2(ctxView, self, idx);
-                WatchUi.pushView(ctxView, ctxDelegate, WatchUi.SLIDE_IMMEDIATE);
-            }
-            return true;
-        }
-
         if (key == WatchUi.KEY_ESC) {
             return false;
         }
@@ -122,37 +89,37 @@ class ReminderMenuDelegate extends WatchUi.InputDelegate {
         return false;
     }
 
-    //! Menu2 calls onBack() when Back key is pressed — must be defined
-    //! since we extend InputDelegate rather than Menu2InputDelegate.
+    //! Menu2 calls onBack() when Back key is pressed.
     function onBack() as Void {
         WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
     }
 
     //! Menu2 calls onWrap() when navigating past the end of the menu.
-    //! Return true to allow wrap-around.
     function onWrap(key as WatchUi.Key) as Boolean {
         return true;
     }
 
-    //! Return to the main menu after data changes
+    //! Show the Activate/Deactivate + Edit + Remove sub-menu.
+    hidden function showReminderActions(index as Number) as Void {
+        System.println("MenuDelegate: showing actions for index=" + index);
+        var actionsView = new ReminderActionsView(_store, index);
+        var actionsDelegate = new ReminderActionsDelegate(_store, index, self);
+        WatchUi.pushView(actionsView, actionsDelegate, WatchUi.SLIDE_IMMEDIATE);
+    }
+
     function rebuildAndShow() as Void {
         var newView = new ReminderMenuView(_store);
         var newDelegate = new ReminderMenuDelegate(_store);
         WatchUi.switchToView(newView, newDelegate, WatchUi.SLIDE_IMMEDIATE);
     }
 
-    //! Push the edit wizard
     function pushEditView(index as Number) as Void {
         System.println("pushEditView called, index=" + index);
         var ev = new ReminderEditView(_store, index);
-        System.println("pushEditView: edit view created");
         var ed = new ReminderEditDelegate2(ev);
-        System.println("pushEditView: delegate created, pushing view...");
         WatchUi.pushView(ev, ed, WatchUi.SLIDE_IMMEDIATE);
-        System.println("pushEditView: pushView done");
     }
 
-    //! Remove a reminder by index
     function removeReminder(index as Number) as Void {
         if (index >= 0 && index < _store.getReminders().size()) {
             _store.removeReminder(index);
@@ -160,147 +127,63 @@ class ReminderMenuDelegate extends WatchUi.InputDelegate {
         }
     }
 
-    //! Get the reminder store
     function getStore() as ReminderStore {
         return _store;
     }
 }
 
 // ──────────────────────────────────────────────
-//  Context menu view (Edit / Remove)
+//  Reminder actions sub-menu (Activate/Deactivate
+//  + Edit + Remove) — shown on Start/Select.
 // ──────────────────────────────────────────────
 
-class ReminderContextMenuView2 extends WatchUi.View {
+class ReminderActionsView extends WatchUi.Menu2 {
 
-    private var _delegate as ReminderMenuDelegate;
-    private var _index    as Number;
-    private var _selOption as Number = 0;
+    function initialize(store as ReminderStore, index as Number) {
+        Menu2.initialize({:title => "Reminder"});
+        var reminders = store.getReminders();
+        if (index < 0 || index >= reminders.size()) { return; }
+        var r = reminders[index];
 
-    const OPTIONS = ["Edit", "Remove"];
-
-    function initialize(delegate as ReminderMenuDelegate, index as Number) {
-        View.initialize();
-        _delegate = delegate;
-        _index    = index;
-    }
-
-    function onUpdate(dc as Graphics.Dc) as Void {
-        var w = dc.getWidth();
-        var h = dc.getHeight();
-
-        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.fillRectangle(0, 0, w, h);
-
-        // Show which reminder this is for
-        var reminders = _delegate.getStore().getReminders();
-        var label = (_index >= 0 && _index < reminders.size())
-            ? reminders[_index].getDisplayText(20) : "";
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, h * 0.12, Graphics.FONT_TINY, label,
-            Graphics.TEXT_JUSTIFY_CENTER);
-
-        var startY = h * 0.25;
-        var rowH = 40;
-
-        for (var i = 0; i < OPTIONS.size(); i++) {
-            var iy = startY + i * rowH;
-            var isSel = (i == _selOption);
-
-            if (isSel) {
-                dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_BLUE);
-            } else if (i % 2 == 0) {
-                dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_DK_GRAY);
-            } else {
-                dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-            }
-            dc.fillRectangle(5, iy, w - 10, rowH - 2);
-
-            dc.setColor(
-                isSel ? Graphics.COLOR_BLACK : Graphics.COLOR_WHITE,
-                Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w / 2, iy + rowH / 2, Graphics.FONT_SMALL, OPTIONS[i],
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
-    }
-
-    function moveUp() as Void {
-        _selOption = 0;
-        WatchUi.requestUpdate();
-    }
-
-    function moveDown() as Void {
-        _selOption = 1;
-        WatchUi.requestUpdate();
-    }
-
-    function getSelectedOption() as Number {
-        return _selOption;
-    }
-
-    function getDelegate() as ReminderMenuDelegate {
-        return _delegate;
-    }
-
-    function getReminderIndex() as Number {
-        return _index;
+        var toggleLabel = r.enabled ? "Deactivate" : "Activate";
+        addItem(new WatchUi.MenuItem(toggleLabel, null, "toggle", {}));
+        addItem(new WatchUi.MenuItem("Edit", null, "edit", {}));
+        addItem(new WatchUi.MenuItem("Remove", null, "remove", {}));
     }
 }
 
-// ──────────────────────────────────────────────
-//  Context menu delegate
-// ──────────────────────────────────────────────
+class ReminderActionsDelegate extends WatchUi.Menu2InputDelegate {
 
-class ReminderContextMenuDelegate2 extends WatchUi.BehaviorDelegate {
-
-    private var _ctxView  as ReminderContextMenuView2;
+    private var _store as ReminderStore;
+    private var _index as Number;
     private var _menuDelegate as ReminderMenuDelegate;
-    private var _index    as Number;
 
-    function initialize(ctxView as ReminderContextMenuView2,
-                        menuDelegate as ReminderMenuDelegate,
-                        index as Number) {
-        BehaviorDelegate.initialize();
-        _ctxView  = ctxView;
+    function initialize(store as ReminderStore,
+                        index as Number,
+                        menuDelegate as ReminderMenuDelegate) {
+        Menu2InputDelegate.initialize();
+        _store = store;
+        _index = index;
         _menuDelegate = menuDelegate;
-        _index    = index;
     }
 
-    function onKey(keyEvent) as Boolean {
-        var key = keyEvent.getKey();
+    function onSelect(item as WatchUi.MenuItem) as Void {
+        var idStr = item.getId() as String;
+        System.println("ActionsDelegate.onSelect: " + idStr);
 
-        if (key == WatchUi.KEY_UP) {
-            _ctxView.moveUp();
-            return true;
-        }
-        if (key == WatchUi.KEY_DOWN) {
-            _ctxView.moveDown();
-            return true;
-        }
-        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
-            doAction();
-            return true;
-        }
-        if (key == WatchUi.KEY_MENU) {
-            doAction();
-            return true;
-        }
-        if (key == WatchUi.KEY_ESC) {
-            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-            return true;
-        }
-        return false;
-    }
-
-    hidden function doAction() as Void {
-        var opt = _ctxView.getSelectedOption();
-        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-        if (opt == 0) {
-            // Edit
+        if (idStr.equals("toggle")) {
+            _store.toggleReminder(_index);
+            _menuDelegate.rebuildAndShow();
+        } else if (idStr.equals("edit")) {
             _menuDelegate.pushEditView(_index);
-        } else {
-            // Remove
-            _menuDelegate.removeReminder(_index);
+        } else if (idStr.equals("remove")) {
+            _store.removeReminder(_index);
+            _menuDelegate.rebuildAndShow();
         }
+    }
+
+    function onBack() as Void {
+        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
     }
 }
 

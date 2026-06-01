@@ -14,8 +14,8 @@ class ReminderEditView extends WatchUi.View {
     const STEP_TIME     = 3;
     const STEP_CONFIRM  = 4;
 
-    const INTERVALS = [300, 900, 1800, 3600, 7200];
-    const INTERVAL_LABELS = ["5 min", "15 min", "30 min", "1 hour", "2 hours"];
+    const INTERVALS = [60, 300, 900, 1800, 3600, 7200];
+    const INTERVAL_LABELS = ["1 min", "5 min", "15 min", "30 min", "1 hour", "2 hours"];
 
     const TYPE_INTERVAL = 0;
     const TYPE_TIME = 1;
