@@ -82,7 +82,7 @@ class ReminderMenuDelegate extends WatchUi.InputDelegate {
         var id = item.getId();
         System.println("MenuDelegate.onSelect: " + id);
         _lastItemId = id as String?;
-        if (id == "add_new") {
+        if (_lastItemId != null && _lastItemId.equals("add_new")) {
             pushEditView(-1);
         }
     }
@@ -133,8 +133,11 @@ class ReminderMenuDelegate extends WatchUi.InputDelegate {
     function pushEditView(index as Number) as Void {
         System.println("pushEditView called, index=" + index);
         var ev = new ReminderEditView(_store, index);
+        System.println("pushEditView: edit view created");
         var ed = new ReminderEditDelegate2(ev, self);
+        System.println("pushEditView: delegate created, pushing view...");
         WatchUi.pushView(ev, ed, WatchUi.SLIDE_IMMEDIATE);
+        System.println("pushEditView: pushView done");
     }
 
     //! Remove a reminder by index

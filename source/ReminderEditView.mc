@@ -45,6 +45,7 @@ class ReminderEditView extends WatchUi.View {
         _store   = store;
         _editIdx = editIdx;
         _step    = STEP_TEXT;
+        System.println("ReminderEditView.initialize");
 
         if (editIdx >= 0) {
             var rem = _store.getReminders();
@@ -58,6 +59,10 @@ class ReminderEditView extends WatchUi.View {
                 }
             }
         }
+    }
+
+    function onShow() as Void {
+        System.println("ReminderEditView.onShow — step=" + _step);
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
