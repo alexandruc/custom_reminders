@@ -50,14 +50,19 @@ class ReminderMenuView extends WatchUi.Menu2 {
     }
 }
 
-//! Delegate for ReminderMenuView
-class ReminderMenuDelegate extends WatchUi.Menu2InputDelegate {
+//! Delegate for ReminderMenuView.
+//! Extends InputDelegate (rather than Menu2InputDelegate) because
+//! Menu2InputDelegate inherits from Object, not InputDelegate, and does
+//! not support onKey(). InputDelegate provides onKey(), and the Menu2
+//! runtime dispatches onSelect(item) / onToggle(item) by method signature
+//! regardless of the delegate's parent class.
+class ReminderMenuDelegate extends WatchUi.InputDelegate {
 
     private var _store as ReminderStore;
     private var _lastItemId as String?;
 
     function initialize(store as ReminderStore) {
-        Menu2InputDelegate.initialize();
+        InputDelegate.initialize();
         _store = store;
         _lastItemId = null;
     }
@@ -75,18 +80,25 @@ class ReminderMenuDelegate extends WatchUi.Menu2InputDelegate {
     //! Handle selection of a menu item (only fires for non-toggle items like "Add new")
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId();
+        System.println("MenuDelegate.onSelect: " + id);
+        _lastItemId = id as String?;
         if (id == "add_new") {
             pushEditView(-1);
         }
-        // ToggleMenuItems are handled by onToggle() — ignore them here
     }
 
-    //! Handle Menu button — show context menu for the last-interacted reminder
+    //! Raw key handler — receives keys that Menu2 does not consume internally
     function onKey(keyEvent) as Boolean {
         var key = keyEvent.getKey();
+        System.println("MenuDelegate.onKey: key=" + key);
+
+        if (key == WatchUi.KEY_START) {
+            System.println("MenuDelegate: KEY_START — launching add flow");
+            pushEditView(-1);
+            return true;
+        }
 
         if (key == WatchUi.KEY_MENU) {
-            // Show context menu (Edit/Remove) — use last toggled item or default to 0
             var reminders = _store.getReminders();
             if (reminders.size() > 0) {
                 var idx = 0;
@@ -104,7 +116,7 @@ class ReminderMenuDelegate extends WatchUi.Menu2InputDelegate {
         }
 
         if (key == WatchUi.KEY_ESC) {
-            return false;  // Let Menu2 handle back navigation
+            return false;
         }
 
         return false;
