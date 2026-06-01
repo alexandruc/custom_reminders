@@ -134,7 +134,7 @@ class ReminderMenuDelegate extends WatchUi.InputDelegate {
         System.println("pushEditView called, index=" + index);
         var ev = new ReminderEditView(_store, index);
         System.println("pushEditView: edit view created");
-        var ed = new ReminderEditDelegate2(ev, self);
+        var ed = new ReminderEditDelegate2(ev);
         System.println("pushEditView: delegate created, pushing view...");
         WatchUi.pushView(ev, ed, WatchUi.SLIDE_IMMEDIATE);
         System.println("pushEditView: pushView done");
@@ -300,12 +300,10 @@ class ReminderContextMenuDelegate2 extends WatchUi.BehaviorDelegate {
 class ReminderEditDelegate2 extends WatchUi.BehaviorDelegate {
 
     private var _ev as ReminderEditView;
-    private var _menuDelegate as ReminderMenuDelegate;
 
-    function initialize(ev as ReminderEditView, menuDelegate as ReminderMenuDelegate) {
+    function initialize(ev as ReminderEditView) {
         BehaviorDelegate.initialize();
         _ev = ev;
-        _menuDelegate = menuDelegate;
     }
 
     function onKey(keyEvent) as Boolean {
@@ -333,8 +331,4 @@ class ReminderEditDelegate2 extends WatchUi.BehaviorDelegate {
         return false;
     }
 
-    function onViewUncovered(info as WatchUi.ViewInfo) as Void {
-        // After returning from edit, rebuild the menu view
-        _menuDelegate.rebuildAndShow();
-    }
 }

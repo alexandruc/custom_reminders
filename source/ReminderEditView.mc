@@ -5,6 +5,7 @@ import Toybox.System;
 
 //! Wizard view for adding/editing reminders (4 steps: Text → Type →
 //! Interval/Time → Confirm).  ON/OFF toggling is done from the list view.
+//! Uses TextPicker for text input (step 1).
 class ReminderEditView extends WatchUi.View {
 
     const STEP_TEXT     = 0;
@@ -13,7 +14,6 @@ class ReminderEditView extends WatchUi.View {
     const STEP_TIME     = 3;
     const STEP_CONFIRM  = 4;
 
-    const CHARS = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,!?-_";
     const INTERVALS = [300, 900, 1800, 3600, 7200];
     const INTERVAL_LABELS = ["5 min", "15 min", "30 min", "1 hour", "2 hours"];
 
@@ -27,11 +27,12 @@ class ReminderEditView extends WatchUi.View {
     private var _text      as String = "";
     private var _type      as Number = 0;
     private var _interval  as Number = 3600;
-    private var _charIdx      as Number = 0;
     private var _timeFieldIdx as Number = 0; // 0=hours, 1=minutes
     private var _hour         as Number = 14;
     private var _minute       as Number = 0;
     private var _intIdx    as Number = 3;
+
+    private var _textPickerDone as Boolean = false;
 
     // Layout
     private var _isSmall  as Boolean = false;
@@ -63,6 +64,11 @@ class ReminderEditView extends WatchUi.View {
 
     function onShow() as Void {
         System.println("ReminderEditView.onShow — step=" + _step);
+        if (_textPickerDone) {
+            _textPickerDone = false;
+            _step = STEP_TYPE;
+            WatchUi.requestUpdate();
+        }
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
@@ -99,17 +105,12 @@ class ReminderEditView extends WatchUi.View {
         dc.drawText(w / 2, _contentY, Graphics.FONT_TINY, label,
             Graphics.TEXT_JUSTIFY_CENTER);
 
-        if (_charIdx < CHARS.length()) {
-            var ch = CHARS.substring(_charIdx, _charIdx + 1);
-            dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w / 2, _contentY + 22, Graphics.FONT_SMALL, ch,
-                Graphics.TEXT_JUSTIFY_CENTER);
-        }
+        dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(w / 2, _contentY + _rowGap, Graphics.FONT_TINY, "[Select to edit]",
+            Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     hidden function drawTypeSelect(dc as Graphics.Dc, w as Number) as Void {
-        // Use green color for selected option ("►" and similar chars not
-        // available on FR245 font set)
         if (_type == TYPE_INTERVAL) {
             dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
             dc.drawText(w / 2, _contentY, Graphics.FONT_TINY, "> Interval",
@@ -173,34 +174,50 @@ class ReminderEditView extends WatchUi.View {
         return "";
     }
 
+    //! Set the reminder text (called by TextPicker delegate).
+    function setText(t as String) as Void {
+        _text = t;
+        System.println("ReminderEditView.setText: " + t);
+    }
+
+    //! Mark that the text picker is done (called by TextPicker delegate).
+    function setTextPickerDone() as Void {
+        _textPickerDone = true;
+    }
+
+    //! Launch the TextPicker for text entry.
+    hidden function showTextPicker() as Void {
+        System.println("ReminderEditView: launching TextPicker");
+        WatchUi.pushView(
+            new WatchUi.TextPicker(_text),
+            new $.TextInputDelegate(self),
+            WatchUi.SLIDE_IMMEDIATE
+        );
+    }
+
     // ── Input handlers ──
 
     function onMenu() as Void {
         System.println("EditView.onMenu step=" + _step);
-        if (_step == STEP_TEXT || _step == STEP_TIME) { nextStep(); }
+        if (_step == STEP_TEXT) { nextStep(); }
+        else if (_step == STEP_TIME) { nextStep(); }
         else if (_step == STEP_CONFIRM) { save(); }
     }
 
     function onSelect() as Void {
         System.println("EditView.onSelect step=" + _step);
-        if      (_step == STEP_TEXT) {
-            if (_charIdx < CHARS.length()) {
-                _text += CHARS.substring(_charIdx, _charIdx + 1);
-                System.println("char added, text now: " + _text);
-                WatchUi.requestUpdate();
-            }
-        } else if (_step == STEP_TYPE     ) { nextStep(); }
-        else if (_step == STEP_INTERVAL   ) { nextStep(); }
-        else if (_step == STEP_TIME       ) { _timeFieldIdx = (_timeFieldIdx + 1) % 2; }
-        else if (_step == STEP_CONFIRM    ) { save(); }
+        if      (_step == STEP_TEXT)     { showTextPicker(); }
+        else if (_step == STEP_TYPE)     { nextStep(); }
+        else if (_step == STEP_INTERVAL) { nextStep(); }
+        else if (_step == STEP_TIME)     { _timeFieldIdx = (_timeFieldIdx + 1) % 2; }
+        else if (_step == STEP_CONFIRM)  { save(); }
     }
 
     function onUp() as Void {
         System.println("EditView.onUp step=" + _step);
-        if      (_step == STEP_TEXT      ) { if (_charIdx > 0) { _charIdx--; } }
-        else if (_step == STEP_TYPE      ) { _type = TYPE_INTERVAL; System.println("  type=INTERVAL"); }
+        if      (_step == STEP_TYPE      ) { _type = TYPE_INTERVAL; }
         else if (_step == STEP_INTERVAL  ) {
-            if (_intIdx > 0) { _intIdx--; _interval = INTERVALS[_intIdx]; System.println("  interval=" + _interval); }
+            if (_intIdx > 0) { _intIdx--; _interval = INTERVALS[_intIdx]; }
         } else if (_step == STEP_TIME    ) {
             if (_timeFieldIdx == 0) { _hour   = (_hour   + 1) % 24; }
             else                    { _minute = (_minute + 5) % 60; }
@@ -210,11 +227,9 @@ class ReminderEditView extends WatchUi.View {
 
     function onDown() as Void {
         System.println("EditView.onDown step=" + _step);
-        if      (_step == STEP_TEXT      ) {
-            if (_charIdx < CHARS.length() - 1) { _charIdx++; }
-        } else if (_step == STEP_TYPE      ) { _type = TYPE_TIME; System.println("  type=TIME"); }
+        if      (_step == STEP_TYPE      ) { _type = TYPE_TIME; }
         else if (_step == STEP_INTERVAL  ) {
-            if (_intIdx < INTERVALS.size() - 1) { _intIdx++; _interval = INTERVALS[_intIdx]; System.println("  interval=" + _interval); }
+            if (_intIdx < INTERVALS.size() - 1) { _intIdx++; _interval = INTERVALS[_intIdx]; }
         } else if (_step == STEP_TIME    ) {
             if (_timeFieldIdx == 0) { _hour   = (_hour   + 23) % 24; }
             else                    { _minute = (_minute + 55) % 60; }
@@ -224,12 +239,8 @@ class ReminderEditView extends WatchUi.View {
 
     function onBackPressed() as Boolean {
         if (_step == STEP_TEXT) {
-            if (_text.length() > 0) {
-                _text = _text.substring(0, _text.length() - 1);
-            } else {
-                WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
-                return false;
-            }
+            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            return false;
         } else if (_step == STEP_TYPE) {
             _step = STEP_TEXT;
         } else if (_step == STEP_INTERVAL || _step == STEP_TIME) {
@@ -260,20 +271,47 @@ class ReminderEditView extends WatchUi.View {
         r.type     = _type;
         r.interval = _interval;
         r.time     = formatTime(_hour, _minute);
-        r.enabled  = true;   // toggled from list view
+        r.enabled  = true;
 
         if (_editIdx >= 0) {
             var rems = _store.getReminders();
             if (_editIdx < rems.size()) {
                 r.id = rems[_editIdx].id;
                 r.lastTriggered = rems[_editIdx].lastTriggered;
-                r.enabled  = rems[_editIdx].enabled;   // preserve existing
+                r.enabled  = rems[_editIdx].enabled;
                 _store.updateReminder(r);
             }
         } else {
             r.id = "r_" + System.getTimer();
             _store.addReminder(r);
         }
-        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+
+        var menuView = new ReminderMenuView(_store);
+        var menuDelegate = new ReminderMenuDelegate(_store);
+        WatchUi.switchToView(menuView, menuDelegate, WatchUi.SLIDE_IMMEDIATE);
+    }
+}
+
+//! Delegate for the TextPicker — receives entered text and passes it
+//! back to the ReminderEditView.
+class TextInputDelegate extends WatchUi.TextPickerDelegate {
+
+    private var _editView as ReminderEditView;
+
+    function initialize(editView as ReminderEditView) {
+        TextPickerDelegate.initialize();
+        _editView = editView;
+    }
+
+    function onTextEntered(text as String, changed as Boolean) as Boolean {
+        System.println("TextInputDelegate.onTextEntered: " + text);
+        _editView.setText(text);
+        _editView.setTextPickerDone();
+        return true;
+    }
+
+    function onCancel() as Boolean {
+        System.println("TextInputDelegate.onCancel");
+        return true;
     }
 }
