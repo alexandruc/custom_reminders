@@ -24,7 +24,11 @@ class CustomRemindersApp extends Application.AppBase {
         _reminderStore.loadFromStorage();
         _alertShowing = false;
         checkPhoneSettings();
-        startForegroundChecks();
+        try {
+            startForegroundChecks();
+        } catch (ex) {
+            System.println("Timer not available (background mode)");
+        }
     }
 
     function onSettingsChanged() as Void {
@@ -53,7 +57,11 @@ class CustomRemindersApp extends Application.AppBase {
 
     function onStop(state as Dictionary?) as Void {
         System.println("CustomRemindersApp: onStop");
-        stopForegroundChecks();
+        try {
+            stopForegroundChecks();
+        } catch (ex) {
+            System.println("Timer not available (background mode)");
+        }
     }
 
     //! Called when the app is woken by Background.requestApplicationWake().

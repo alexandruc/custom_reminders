@@ -78,8 +78,8 @@ class ReminderEditView extends WatchUi.View {
 
         _marginT = _isSmall ? 35 : 15;
         _marginB = _isSmall ? 40 : 18;
-        _rowGap  = _isSmall ? 20 : 32;
-        _contentY = _marginT + 24;
+        _rowGap  = _isSmall ? 30 : 42;
+        _contentY = _marginT + 28;
 
         // Background
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
@@ -158,7 +158,7 @@ class ReminderEditView extends WatchUi.View {
         var sched = (_type == TYPE_INTERVAL)
             ? "Every " + INTERVAL_LABELS[_intIdx]
             : formatTime(_hour, _minute);
-        dc.drawText(w / 2, _contentY + _rowGap + 12, Graphics.FONT_TINY, sched,
+        dc.drawText(w / 2, _contentY + _rowGap * 2, Graphics.FONT_TINY, sched,
             Graphics.TEXT_JUSTIFY_CENTER);
     }
 
