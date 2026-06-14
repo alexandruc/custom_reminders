@@ -37,7 +37,7 @@ class ReminderStore {
 
     function updateReminder(reminder as Reminder) as Boolean {
         for (var i = 0; i < _reminders.size(); i++) {
-            if (_reminders[i].id == reminder.id) {
+            if (_reminders[i].id.equals(reminder.id)) {
                 _reminders[i] = reminder;
                 saveToStorage();
                 return true;
@@ -79,13 +79,10 @@ class ReminderStore {
     }
 
     function saveToStorage() as Void {
-        // Store reminder count and individual fields by index
-        // Edge case: handle storage overflow by limiting stored fields
         try {
             Storage.setValue(STORAGE_KEY + "_count", _reminders.size());
         } catch (ex) {
-            System.println("ReminderStore: Storage overflow - clearing old data");
-            _reminders = [];
+            System.println("ReminderStore: Storage write failed");
             return;
         }
         for (var i = 0; i < _reminders.size(); i++) {
