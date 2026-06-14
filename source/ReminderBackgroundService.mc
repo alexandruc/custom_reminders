@@ -7,6 +7,7 @@ import Toybox.Time;
 //! Background service for checking reminders.
 //! On SDK 3.x, this runs in an isolated process — all logic is inlined
 //! here since we cannot import non-background classes.
+(:background)
 class ReminderBackgroundService extends System.ServiceDelegate {
 
     const STORAGE_PREFIX = "reminders_";
@@ -43,7 +44,6 @@ class ReminderBackgroundService extends System.ServiceDelegate {
     //! Register the next temporal event (5 minutes from now)
     hidden function registerNextEvent() as Void {
         try {
-            var now = System.getClockTime();
             var nowEpoch = Time.now().value();
             var targetEpoch = nowEpoch + 300; // 5 minutes in seconds
             var targetMoment = new Time.Moment(targetEpoch);

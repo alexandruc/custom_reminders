@@ -8,7 +8,6 @@ class ReminderAlertView extends WatchUi.View {
 
     private var _reminderText as String;
     private var _scheduleInfo as String?;
-    private var _isSmallScreen as Boolean = false;
 
     function initialize(text as String, scheduleInfo as String?) {
         View.initialize();
@@ -17,39 +16,44 @@ class ReminderAlertView extends WatchUi.View {
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
-        var width = dc.getWidth();
-        var height = dc.getHeight();
-        var minDim = width < height ? width : height;
-        _isSmallScreen = (minDim <= 240);
+        var w = dc.getWidth();
+        var h = dc.getHeight();
 
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.fillRectangle(0, 0, width, height);
+        dc.fillRectangle(0, 0, w, h);
 
-        // Alert box
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawRoundedRectangle(10, 30, width - 20, height - 80, 10);
+        var gap = (h * 0.06).toNumber();
+        var hasSchedule = (_scheduleInfo != null);
+
+        // Calculate total block height to center vertically
+        var titleH = Graphics.getFontHeight(Graphics.FONT_MEDIUM);
+        var textH = Graphics.getFontHeight(Graphics.FONT_SMALL);
+        var totalH = titleH + gap + textH;
+        if (hasSchedule) {
+            totalH = totalH + gap + textH;
+        }
+        var startY = (h - totalH) / 2;
 
         // Title
-        dc.drawText(width / 2, 50, Graphics.FONT_MEDIUM, "Reminder", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(w / 2, startY, Graphics.FONT_MEDIUM, "Reminder", Graphics.TEXT_JUSTIFY_CENTER);
 
         // Reminder text
-        dc.drawText(width / 2, height / 3, Graphics.FONT_SMALL, _reminderText, Graphics.TEXT_JUSTIFY_CENTER);
+        startY = startY + titleH + gap;
+        dc.drawText(w / 2, startY, Graphics.FONT_SMALL, _reminderText, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Schedule info
-        if (_scheduleInfo != null) {
+        if (hasSchedule) {
+            startY = startY + textH + gap;
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(width / 2, height * 2 / 3, Graphics.FONT_SMALL, _scheduleInfo, Graphics.TEXT_JUSTIFY_CENTER);
+            dc.drawText(w / 2, startY, Graphics.FONT_SMALL, _scheduleInfo, Graphics.TEXT_JUSTIFY_CENTER);
         }
 
-        // Dismiss hint
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(width / 2, height - 40, Graphics.FONT_TINY, "SELECT to dismiss", Graphics.TEXT_JUSTIFY_CENTER);
-
-        // Power save warning
+        // Power save warning at bottom
         var settings = System.getDeviceSettings();
         if (settings has :powerSave && settings.powerSave) {
             dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(width / 2, height - 55, Graphics.FONT_TINY, "Power save ON", Graphics.TEXT_JUSTIFY_CENTER);
+            dc.drawText(w / 2, h - 15, Graphics.FONT_TINY, "Power save ON", Graphics.TEXT_JUSTIFY_CENTER);
         }
     }
 
