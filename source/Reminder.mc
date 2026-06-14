@@ -35,7 +35,8 @@ class Reminder {
 
         if (type == TYPE_INTERVAL) {
             if (lastTriggered == null) {
-                return true;
+                lastTriggered = Time.now().value();
+                return false;
             }
             var nowEpoch = Time.now().value();
             var elapsed = nowEpoch - lastTriggered;

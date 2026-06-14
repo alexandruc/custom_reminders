@@ -87,7 +87,8 @@ class ReminderBackgroundService extends System.ServiceDelegate {
 
                 var nowEpoch = Time.now().value();
                 if (lastTriggered == null) {
-                    fired = true;
+                    Storage.setValue(prefix + "_lastTriggered", nowEpoch);
+                    continue;
                 } else {
                     var elapsed = nowEpoch - (lastTriggered as Number);
                     if (elapsed >= (interval as Number)) {
@@ -106,7 +107,8 @@ class ReminderBackgroundService extends System.ServiceDelegate {
                             if (now.hour == targetHour && now.min == targetMin) {
                                 var lastTriggered = Storage.getValue(prefix + "_lastTriggered");
                                 if (lastTriggered == null) {
-                                    fired = true;
+                                    Storage.setValue(prefix + "_lastTriggered", Time.now().value());
+                                    continue;
                                 } else {
                                     var nowEpoch = Time.now().value();
                                     if (nowEpoch - (lastTriggered as Number) > 60) {

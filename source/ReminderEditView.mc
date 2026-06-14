@@ -2,7 +2,7 @@ import Toybox.Lang;
 import Toybox.WatchUi;
 import Toybox.Graphics;
 import Toybox.System;
-
+import Toybox.Time;
 //! Wizard view for adding/editing reminders (4 steps: Text → Type →
 //! Interval/Time → Confirm).  ON/OFF toggling is done from the list view.
 //! Uses TextPicker for text input (step 1).
@@ -283,6 +283,7 @@ class ReminderEditView extends WatchUi.View {
             }
         } else {
             r.id = "r_" + System.getTimer();
+            r.lastTriggered = Time.now().value();
             _store.addReminder(r);
         }
 
