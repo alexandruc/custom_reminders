@@ -5,7 +5,7 @@ import Toybox.WatchUi;
 import Toybox.Graphics;
 import Toybox.System;
 import Toybox.Timer;
-
+import Toybox.Time;
 //! Main app class
 class CustomRemindersApp extends Application.AppBase {
 
@@ -20,8 +20,20 @@ class CustomRemindersApp extends Application.AppBase {
 
     function onStart(state as Dictionary?) as Void {
         System.println("CustomRemindersApp: onStart");
-        _reminderStore = new ReminderStore();
-        _reminderStore.loadFromStorage();
+        try {
+            var store = getStore();
+            store.loadFromStorage();
+            var reminders = store.getReminders();
+            var nowEpoch = Time.now().value();
+            for (var i = 0; i < reminders.size(); i++) {
+                if (reminders[i].lastTriggered == null) {
+                    reminders[i].lastTriggered = nowEpoch;
+                }
+            }
+            store.saveToStorage();
+        } catch (ex) {
+            System.println("App: startup error " + ex);
+        }
         _alertShowing = false;
         checkPhoneSettings();
         try {

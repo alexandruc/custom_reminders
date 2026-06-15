@@ -85,16 +85,20 @@ class ReminderStore {
             System.println("ReminderStore: Storage write failed");
             return;
         }
-        for (var i = 0; i < _reminders.size(); i++) {
-            var r = _reminders[i];
-            var prefix = STORAGE_KEY + "_" + i;
-            Storage.setValue(prefix + "_id", r.id);
-            Storage.setValue(prefix + "_text", r.text);
-            Storage.setValue(prefix + "_type", r.type);
-            Storage.setValue(prefix + "_interval", r.interval);
-            Storage.setValue(prefix + "_time", r.time);
-            Storage.setValue(prefix + "_enabled", r.enabled);
-            Storage.setValue(prefix + "_lastTriggered", r.lastTriggered);
+        try {
+            for (var i = 0; i < _reminders.size(); i++) {
+                var r = _reminders[i];
+                var prefix = STORAGE_KEY + "_" + i;
+                Storage.setValue(prefix + "_id", r.id);
+                Storage.setValue(prefix + "_text", r.text);
+                Storage.setValue(prefix + "_type", r.type);
+                Storage.setValue(prefix + "_interval", r.interval);
+                Storage.setValue(prefix + "_time", r.time);
+                Storage.setValue(prefix + "_enabled", r.enabled);
+                Storage.setValue(prefix + "_lastTriggered", r.lastTriggered);
+            }
+        } catch (ex) {
+            System.println("ReminderStore: Error saving fields");
         }
     }
 
